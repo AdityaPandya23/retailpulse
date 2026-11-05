@@ -3,6 +3,11 @@ seed: 42
 cutoff: "2011-09-09"     # features use ONLY data strictly before this date
 horizon_days: 90         # label window: [cutoff, cutoff + horizon_days)
 
+stats:
+  alpha: 0.05
+  year1: ["2009-12-01", "2010-12-01"]   # [start, end): Y1 = 2009-12-01 -> 2010-11-30
+  year2: ["2010-12-01", "2011-12-01"]   # [start, end): Y2 = 2010-12-01 -> 2011-11-30
+
 data:
   url: "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
   xlsx_name: "online_retail_II.xlsx"

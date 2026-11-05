@@ -1,7 +1,9 @@
-# data & generated outputs (never commit)
+# data & generated outputs (never commit); artifacts/mock/ is tiny synthetic data -> tracked.
+# "artifacts/*" (not "artifacts/"): git cannot re-include a path whose parent dir is ignored.
 data/
-artifacts/
+artifacts/*
 !artifacts/mock/
+artifacts/mock/**/*.tmp
 
 # env / caches
 .venv/

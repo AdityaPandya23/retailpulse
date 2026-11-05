@@ -24,6 +24,10 @@ CUTOFF: pd.Timestamp = pd.Timestamp(_CFG["cutoff"])
 HORIZON_DAYS: int = int(_CFG["horizon_days"])
 HORIZON_END: pd.Timestamp = CUTOFF + timedelta(days=HORIZON_DAYS)
 
+ALPHA: float = float(_CFG["stats"]["alpha"])
+YEAR1: tuple[pd.Timestamp, pd.Timestamp] = tuple(pd.Timestamp(d) for d in _CFG["stats"]["year1"])
+YEAR2: tuple[pd.Timestamp, pd.Timestamp] = tuple(pd.Timestamp(d) for d in _CFG["stats"]["year2"])
+
 DATA_URL: str = _CFG["data"]["url"]
 XLSX_NAME: str = _CFG["data"]["xlsx_name"]
 
