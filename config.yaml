@@ -1,0 +1,8 @@
+# RetailPulse configuration — single source for dates, seed and data source.
+seed: 42
+cutoff: "2011-09-09"     # features use ONLY data strictly before this date
+horizon_days: 90         # label window: [cutoff, cutoff + horizon_days)
+
+data:
+  url: "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
+  xlsx_name: "online_retail_II.xlsx"
