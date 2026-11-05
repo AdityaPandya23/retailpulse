@@ -22,6 +22,7 @@ One-day build. Zero cost: only free/open-source tools; no paid APIs.
 3. Drop Quantity <= 0 or Price <= 0 from sales.
 4. Missing Customer ID: compare these rows with the rest (Mann-Whitney U on Quantity/Price,
    chi-square on UK vs non-UK) and discuss MCAR/MAR, then drop from customer-level analysis.
+   (Done in P1: 22.7% of lines, missing per whole invoice, not MCAR → results cover registered customers.)
 5. Impute missing Description with the most common Description for that StockCode.
 - Line value = Quantity × Price.
 
@@ -106,3 +107,35 @@ warehousing, OLAP, cubes.
 | P3 Models | 3a segment/ · 3b predict/ + baskets/ (parallel OK) | P2 |
 | P4 App | 4 pages on real artifacts | P3 |
 | P5 Polish + Ship | review, demo fixes, deploy, DEMO_SCRIPT.md | P4 |
+
+## P2 detail (updated after P1 — see PROGRESS.md)
+Already done in P1, do NOT redo: contracts.py (extend it), pipeline Stage pattern (register new stages),
+missing-ID analysis, cleaning funnel, warehouse views, format comparison.
+
+Inputs: data/processed/sales.parquet (779,425 lines, registered customers only) and returns.parquet
+(contains 714 "C" lines with no customer_id → filter on customer_id before per-customer features).
+
+1. **features.py**
+   - `build_features(sales, returns, cutoff)` → one row per customer with ≥1 purchase before cutoff;
+     uses ONLY rows with invoice_date < cutoff. Recency measured from cutoff.
+   - `build_labels(sales, cutoff, horizon_days)` → returned_flag, next_spend from [cutoff, cutoff+90d).
+     cutoff 2011-09-09 + 90d ends 2011-12-08, inside the data (ends 2011-12-09).
+   - Two snapshots: **features_cutoff** (modelling: P3a segmentation AND P3b prediction both use this,
+     so segment labels can be used as a feature without leakage) and **features_full**
+     (cutoff = max date + 1 day; descriptive EDA only).
+   - Leakage test: changing any row after cutoff must not change features_cutoff.
+2. **stats/**
+   - distributions.py: per-customer order value ~ lognormal, frequency ~ Poisson vs negative binomial
+     (dispersion ratio), inter-purchase gap ~ exponential; save Q-Q points + fit params + AIC.
+   - tests.py: repeat vs one-time avg basket value → Welch t vs Mann-Whitney U (+ effect sizes);
+     paired t-test on customers active in both Y1 (2009-12-01→2010-11-30) and Y2 (2010-12-01→2011-11-30);
+     Pearson vs Spearman correlation + covariance matrices of features_full.
+   - Every result → metrics entry with a one-line plain-English conclusion.
+3. **cube.py**: DuckDB `GROUP BY CUBE(country, year, month)` over the warehouse views → small parquet
+   (revenue, orders, customers) for the OLAP page.
+4. **EDA data**: small aggregate tables (not images) for histograms/frequency polygons, box plots,
+   monthly sales/orders, country revenue, top-customer revenue share (Lorenz/Pareto), cohort retention
+   matrix → artifacts/eda/.
+5. **Mock artifacts**: artifacts/mock/ (tracked in git) with tiny fake files matching every P3 contract
+   (segments, predictions, rules, model metrics) so P4 can start before P3 finishes.
+6. Register stages `features`, `stats`, `cube`, `eda`, `mock` in pipeline.py; tests on the fixture.
