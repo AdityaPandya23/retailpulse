@@ -225,9 +225,11 @@ def run_classification(
 
     # max mean CV AUC on train; ties -> earlier (simpler) model in C.CLASSIFIERS
     best = max(C.CLASSIFIERS, key=lambda m: (models[m]["cv_auc_mean"], -C.CLASSIFIERS.index(m)))
-    other = "logistic"
-    if best == "logistic":
-        rest = [m for m in C.CLASSIFIERS if m != "logistic"]
+    # compared with logistic (the simple reference) when it is configured, else the runner-up
+    rest = [m for m in C.CLASSIFIERS if m != best]
+    if best != "logistic" and "logistic" in rest:
+        other = "logistic"
+    else:
         other = max(rest, key=lambda m: (models[m]["cv_auc_mean"], -C.CLASSIFIERS.index(m)))
     n_val = int(np.mean([len(va) for _, va in folds]))
     pt = _paired_t(cv[best], cv[other], len(train) - n_val, n_val)

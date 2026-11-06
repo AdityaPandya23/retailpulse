@@ -376,27 +376,27 @@ def recommend(
 
 
 def recommend_from_basket(
-    codes, rules: pd.DataFrame | None, popularity, n: int = RULES.n_recommend
+    codes, rules: pd.DataFrame | None, best_sellers, n: int = RULES.n_recommend
 ) -> pd.DataFrame:
     """Top-n products for a basket of stock codes, never one already in the basket.
 
     rules: rules.parquet-like frame; only the "overall" scope is used (a basket has no segment).
-    popularity: products.parquet-like frame (stock_code, n_invoices[, description]) or a
+    best_sellers: products.parquet-like frame (stock_code, n_invoices[, description]) or a
     Series stock_code -> n_invoices (popularity()). Rule items rank by score = sum of
     confidence x lift (_rule_scores), their reason is the strongest fired rule; the rest are
     best sellers ("popular", score NaN, no reason). Returns BASKET_REC_COLUMNS.
     """
     basket = {str(c) for c in codes}
     lookup: dict[str, str] = {}
-    if isinstance(popularity, pd.DataFrame):
-        products = popularity.assign(stock_code=popularity["stock_code"].astype(str))
+    if isinstance(best_sellers, pd.DataFrame):
+        products = best_sellers.assign(stock_code=best_sellers["stock_code"].astype(str))
         if "description" in products.columns:
             lookup = dict(
                 zip(products["stock_code"], products["description"].astype(str), strict=True)
             )
         pop = products.set_index("stock_code")["n_invoices"]
     else:
-        pop = pd.Series(popularity, dtype="float64")
+        pop = pd.Series(best_sellers, dtype="float64")
         pop.index = pop.index.astype(str)
     order = sorted(pop.index, key=lambda c: (-float(pop[c]), c))  # best sellers first
     pop_rank = {c: i for i, c in enumerate(order)}
@@ -534,6 +534,9 @@ def summarize(
         "recommendation_note": (
             "score = sum of confidence x lift of fired rules (segment rules rank first); "
             "'popular' fill items score their invoice support in the segment (else overall)"
+            if seg_scopes
+            else "score = sum of confidence x lift of the fired overall rules; 'popular' fill "
+            "items score their invoice support (overall best sellers)"
         ),
         "conclusion": (
             f"{n_rules[OVERALL]} overall rules"

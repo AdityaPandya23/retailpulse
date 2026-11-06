@@ -181,7 +181,8 @@ def cohorts(sales: pd.DataFrame) -> pd.DataFrame:
 def sample_rows(sales: pd.DataFrame, n: int = N_SAMPLE_ROWS, seed: int = SEED) -> pd.DataFrame:
     """n random cleaned sales lines (seeded), oldest first, in the cleaned column order."""
     C.require_columns(sales, C.SAMPLE_ROWS_COLUMNS, "sales")
-    rows = sales[C.SAMPLE_ROWS_COLUMNS].sample(n=min(n, len(sales)), random_state=seed)
+    # sample first (same rows: positions only), then copy just those rows' columns
+    rows = sales.sample(n=min(n, len(sales)), random_state=seed)[C.SAMPLE_ROWS_COLUMNS]
     rows = rows.sort_values(["invoice_date", "invoice", "stock_code"]).reset_index(drop=True)
     return C.validate(rows, C.EDA_SAMPLE_ROWS_PARQUET)
 

@@ -60,7 +60,8 @@ layout.kpi_row(
             "label": "Best model · test ROC-AUC",
             "value": f"{best_auc:.3f}" if best_auc else "n/a",
             "help": (
-                f"{best} was chosen on train cross-validation only; all five models score "
+                f"{best} was chosen on train cross-validation only; "
+                f"all {len(test_aucs)} models score "
                 f"{min(test_aucs):.2f}–{max(test_aucs):.2f} on the future window."
                 if test_aucs
                 else None
@@ -123,7 +124,8 @@ with qa, st.container(border=True):
 with qb, st.container(border=True):
     st.markdown("#### B · Who will come back?")
     st.markdown(
-        f"Five classifiers predict 'buys again within {horizon} days' on an out-of-time split; "
+        f"{len(C.CLASSIFIERS)} classifiers predict 'buys again within {horizon} days' "
+        "on an out-of-time split; "
         "a Time Machine backtest compares the predictions with what really happened."
     )
     st.page_link("pages/3_Predictions.py", label="Predictions", icon=":material/insights:")

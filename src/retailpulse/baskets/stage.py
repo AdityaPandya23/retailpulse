@@ -83,11 +83,6 @@ def compute(
     ]
 
     metrics["per_segment"] = bool(per_segment)
-    if not metrics["segments_used"]:
-        metrics["recommendation_note"] = (
-            "score = sum of confidence x lift of the fired overall rules; 'popular' fill items "
-            "score their invoice support (overall best sellers)"
-        )
     tables = {
         C.RULES_PARQUET: rules,
         C.RECOMMENDATIONS_PARQUET: recs,

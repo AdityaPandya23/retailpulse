@@ -174,6 +174,8 @@ ALL_CLASSIFIERS = ["logistic", "lda", "qda", "naive_bayes", "knn"]  # what class
 _UNKNOWN_MODELS = sorted(set(PREDICT.models) - set(ALL_CLASSIFIERS))
 if _UNKNOWN_MODELS:
     raise ValueError(f"config.yaml predict.models has unknown classifiers: {_UNKNOWN_MODELS}")
+if len(set(PREDICT.models)) < 2:  # the paired t-test compares the best model with another one
+    raise ValueError("config.yaml predict.models needs at least 2 classifiers")
 # trained + compared (config.yaml predict.models), always in ALL_CLASSIFIERS order
 CLASSIFIERS = [m for m in ALL_CLASSIFIERS if m in PREDICT.models]
 REGRESSORS = ["simple_lr", "multiple_lr", "knn"]

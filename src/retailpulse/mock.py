@@ -609,7 +609,8 @@ def build_mock_models(
     pca = PCA(n_components=3, random_state=SEED).fit(seg_pipe[:-1].transform(f[feats]))
     names = dict(zip(seg["segment"].astype(int), seg["segment_name"].astype(str), strict=True))
     df = f.merge(lab, on="customer_id")
-    best = ((metrics or {}).get("classify") or {}).get("best_model", C.CLASSIFIERS[0])
+    classify = (metrics or {}).get("classify") or {}
+    best = classify.get("best_model", C.CLASSIFIERS[0])
     X, y = df[FEATURES], df["returned_flag"]
     pipes = {m: make_classifier(m, k=5).fit(X, y) for m in C.CLASSIFIERS}
     clf = pipes[best] if best in pipes else make_classifier(best, k=5).fit(X, y)
@@ -633,7 +634,9 @@ def build_mock_models(
         },
         C.CLASSIFIERS_JOBLIB: {
             "pipelines": pipes,
-            "thresholds": dict.fromkeys(pipes, 0.5),  # = the mock classify thresholds
+            "thresholds": {  # = the mock classify thresholds
+                m: float(classify.get("models", {}).get(m, {}).get("threshold", 0.5)) for m in pipes
+            },
             "features": list(FEATURES),
             "best_model": best,
             "mock": True,

@@ -21,7 +21,8 @@ horizon = feats.get("horizon_days", 90)
 layout.page_header(
     "Predictions",
     f"B · Who will come back in the {horizon} days after the cutoff?",
-    "Five classifiers were trained on an earlier snapshot and judged on the future window "
+    f"{len(C.CLASSIFIERS)} classifiers were trained on an earlier snapshot and judged on the "
+    "future window "
     "(out-of-time split). The model is chosen on train cross-validation only.",
 )
 
@@ -156,9 +157,10 @@ with tab_models:
     roc_fig, pr_fig = _roc_pr(data.table(C.ROC_PARQUET), data.table(C.PR_PARQUET), cls, base_rate)
     tour.callout(
         3,
-        "All five curves lie close together, far above the chance diagonal: every model ranks "
+        f"All {len(C.CLASSIFIERS)} curves lie close together, far above the chance diagonal: "
+        "every model ranks "
         "customers much better than guessing, and they are nearly interchangeable.",
-        "Five models, one story",
+        f"{len(C.CLASSIFIERS)} models, one story",
     )
     c1, c2 = st.columns(2)
     with c1:
