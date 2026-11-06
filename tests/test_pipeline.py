@@ -1,7 +1,30 @@
+import os
+
 import numpy as np
 
 from retailpulse import contracts as C
-from retailpulse.pipeline import STAGES
+from retailpulse.pipeline import STAGES, Stage, up_to_date
+
+
+def test_stage_reruns_when_an_input_is_newer(tmp_path):
+    inp, out = tmp_path / "in.parquet", tmp_path / "out.parquet"
+    inp.write_text("x")
+    out.write_text("y")
+    stage = Stage("s", lambda: None, (out,), inputs=(inp, tmp_path / "missing.parquet"))
+    os.utime(inp, (1_000, 1_000))
+    os.utime(out, (2_000, 2_000))
+    assert up_to_date(stage)  # output newer; a missing input is ignored
+    os.utime(inp, (3_000, 3_000))
+    assert not up_to_date(stage)  # e.g. config.yaml or features edited after the run
+    out.unlink()
+    assert not up_to_date(stage)
+
+
+def test_downstream_stages_declare_their_inputs():
+    by_name = {s.name: s for s in STAGES}
+    assert C.FEATURES_FULL_PARQUET in by_name["stats"].inputs
+    assert C.FEATURES_FULL_PARQUET in by_name["eda"].inputs
+    assert any(p.name == "config.yaml" for p in by_name["features"].inputs)
 
 
 def test_stage_order():

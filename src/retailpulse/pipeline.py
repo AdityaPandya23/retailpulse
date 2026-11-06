@@ -1,4 +1,5 @@
-"""Offline pipeline. Runs stages in order; skips a stage whose outputs all exist.
+"""Offline pipeline. Runs stages in order; skips a stage whose outputs exist and are newer
+than its inputs (so `--only features` makes the next plain run refresh stats and eda).
 
 Stages: ingest -> clean -> warehouse -> features -> stats -> cube -> eda -> mock
 
@@ -28,7 +29,7 @@ from retailpulse import ingest as ingest_mod
 from retailpulse import mock as mock_mod
 from retailpulse import warehouse as warehouse_mod
 from retailpulse.clean import clean
-from retailpulse.config import CUTOFF, HORIZON_DAYS
+from retailpulse.config import CONFIG_PATH, CUTOFF, HORIZON_DAYS
 from retailpulse.stats import distributions
 from retailpulse.stats import tests as stat_tests
 
@@ -41,6 +42,18 @@ class Stage:
     run: Callable[[], dict | None]
     outputs: tuple[Path, ...]
     metrics: tuple[str, ...] = ()  # metrics.json sections it writes (must exist to skip)
+    inputs: tuple[Path, ...] = ()  # rerun when any input is newer than the oldest output
+
+
+def up_to_date(stage: Stage) -> bool:
+    """Outputs + metrics sections exist and no (existing) input is newer than any output."""
+    if not C.all_exist(list(stage.outputs)) or not C.has_metrics(stage.metrics):
+        return False
+    inputs = [Path(p) for p in stage.inputs if Path(p).exists()]
+    if not inputs:
+        return True
+    oldest_output = min(Path(p).stat().st_mtime for p in stage.outputs)
+    return oldest_output >= max(p.stat().st_mtime for p in inputs)
 
 
 def _write_json(path: Path, obj) -> None:
@@ -136,29 +149,40 @@ def run_mock() -> dict:
     return {"files": len(tables) + 1}
 
 
+_CLEANED = (C.SALES_PARQUET, C.RETURNS_PARQUET)
+
 STAGES: list[Stage] = [
     Stage("ingest", run_ingest, (C.RAW_PARQUET, C.FORMAT_COMPARISON_JSON)),
     Stage(
         "clean",
         run_clean,
-        (C.SALES_PARQUET, C.RETURNS_PARQUET, C.CLEANING_STEPS_JSON, C.MISSING_ID_JSON),
+        (*_CLEANED, C.CLEANING_STEPS_JSON, C.MISSING_ID_JSON),
+        inputs=(C.RAW_PARQUET,),
     ),
-    Stage("warehouse", run_warehouse, (C.WAREHOUSE_SUMMARY_JSON,)),
+    Stage("warehouse", run_warehouse, (C.WAREHOUSE_SUMMARY_JSON,), inputs=_CLEANED),
     Stage(
         "features",
         run_features,
         (C.FEATURES_CUTOFF_PARQUET, C.LABELS_PARQUET, C.FEATURES_FULL_PARQUET),
         ("features",),
+        inputs=(*_CLEANED, CONFIG_PATH),  # cutoff / horizon live in config.yaml
     ),
     Stage(
         "stats",
         run_stats,
         (C.QQ_PARQUET, C.FREQUENCY_FIT_PARQUET, C.CORRELATION_PARQUET),
         ("stats",),
+        inputs=(C.FEATURES_FULL_PARQUET, C.SALES_PARQUET, CONFIG_PATH),  # alpha, Y1/Y2
     ),
-    Stage("cube", run_cube, (C.CUBE_PARQUET,)),
-    Stage("eda", run_eda, C.EDA_OUTPUTS, ("eda",)),
-    Stage("mock", run_mock, C.MOCK_OUTPUTS),
+    Stage("cube", run_cube, (C.CUBE_PARQUET,), inputs=_CLEANED),
+    Stage(
+        "eda",
+        run_eda,
+        C.EDA_OUTPUTS,
+        ("eda",),
+        inputs=(C.FEATURES_FULL_PARQUET, C.SALES_PARQUET),
+    ),
+    Stage("mock", run_mock, C.MOCK_OUTPUTS),  # synthetic: depends only on code + seed
 ]
 
 
@@ -173,8 +197,8 @@ def main(argv: list[str] | None = None) -> None:
         if args.only and stage.name not in args.only:
             continue
         forced = args.force or bool(args.only)
-        if not forced and C.all_exist(list(stage.outputs)) and C.has_metrics(stage.metrics):
-            log.info("[skip] %s (outputs exist)", stage.name)
+        if not forced and up_to_date(stage):
+            log.info("[skip] %s (outputs up to date)", stage.name)
             continue
         t0 = time.perf_counter()
         log.info("[run ] %s", stage.name)

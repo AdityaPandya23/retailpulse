@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -316,7 +317,16 @@ def write_json(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(to_jsonable(obj), indent=2, allow_nan=False), encoding="utf-8")
-    os.replace(tmp, path)
+    # Windows refuses to replace a file another process (e.g. the app) has open: retry briefly
+    for attempt in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 4:
+                tmp.unlink(missing_ok=True)
+                raise
+            time.sleep(0.2 * (attempt + 1))
 
 
 def read_metrics(path: Path = METRICS_JSON) -> dict:

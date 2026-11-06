@@ -188,7 +188,8 @@ def run(features_full: pd.DataFrame, sales: pd.DataFrame) -> tuple[dict[Path, pd
         C.EDA_COHORTS_PARQUET: cohorts(sales),
     }
     full_months = monthly_df.loc[~monthly_df["is_partial"]]
-    peak = full_months.loc[full_months["revenue"].idxmax()]
+    candidates = full_months if len(full_months) else monthly_df  # short ranges: all partial
+    peak = candidates.loc[candidates["revenue"].idxmax()]
     uk_share = float(countries_df.loc[countries_df["is_uk"], "revenue_share"].sum())
     summary = {
         **conc,

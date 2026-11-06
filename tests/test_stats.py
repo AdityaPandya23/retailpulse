@@ -153,6 +153,30 @@ def test_paired_spend_typical_drop_hidden_by_outliers():
     assert "median change -£22" in res["conclusion"]
 
 
+def test_paired_spend_all_differences_zero():
+    rows = [(c, d, 100.0) for c in range(5) for d in ("2010-06-01", "2011-06-01")]
+    res = T.paired_spend(_yearly_sales(rows))  # scipy's wilcoxon would raise here
+    assert res["n_customers"] == 5 and "exactly the same" in res["conclusion"]
+
+
+@pytest.mark.filterwarnings("ignore:Precision loss occurred:RuntimeWarning")
+def test_compare_groups_constant_groups_agree():
+    # zero pooled SD forces d = 0; that must not be reported as a direction conflict
+    res = T.compare_groups([0.0] * 10, [0.2] * 10, "A", "B", "return rate")
+    assert res["mann_whitney"]["p_value"] < 0.05
+    assert "disagrees" not in res["conclusion"]
+
+
+def test_correlations_with_constant_column(shop_full):
+    entry, long = T.correlations(shop_full.assign(non_uk_share=0.0))
+    assert "non_uk_share" not in (
+        entry["strongest_spearman"]["x"],
+        entry["strongest_spearman"]["y"],
+    )
+    entry, _ = T.correlations(shop_full.assign(a=1.0, b=2.0), columns=["a", "b"])
+    assert "Not enough variation" in entry["conclusion"]
+
+
 # ---------------- correlation ----------------
 def test_correlations_matrices(shop_full):
     entry, long = T.correlations(shop_full)

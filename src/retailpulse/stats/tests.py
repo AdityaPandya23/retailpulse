@@ -18,6 +18,8 @@ from retailpulse.config import ALPHA, YEAR1, YEAR2
 
 
 def fmt_p(p: float) -> str:
+    if not np.isfinite(p):
+        return "p n/a"
     return "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
 
 
@@ -128,7 +130,8 @@ def compare_groups(
             f"no significant difference in {what} between {name_a} and {name_b} (median "
             f"{_fmt(med_a, unit)} vs {_fmt(med_b, unit)}; Mann-Whitney {fmt_p(u.pvalue)})"
         )
-    agree = (u_sig == t_sig) and (not u_sig or np.sign(d) == np.sign(r))
+    # direction from the raw mean difference: d is forced to 0 when both groups are constant
+    agree = (u_sig == t_sig) and (not u_sig or np.sign(a.mean() - b.mean()) == np.sign(r))
     tail = (
         f"; Welch's t-test on the means ({_fmt(a.mean(), unit)} vs {_fmt(b.mean(), unit)}, "
         f"{fmt_p(t.pvalue)}, d = {d:+.2f}) "
@@ -193,6 +196,13 @@ def paired_spend(
         return out
 
     diff = b - a
+    if not np.any(diff):  # scipy's wilcoxon raises when every difference is zero
+        out["mean_change"] = out["median_change"] = 0.0
+        out["conclusion"] = (
+            f"All {len(both):,} customers active in both years spent exactly the same in each "
+            "year, so there is nothing to test."
+        )
+        return out
     t = stats.ttest_rel(b, a)
     w = stats.wilcoxon(diff)
     sd = diff.std(ddof=1)
@@ -275,6 +285,15 @@ def correlations(
         }
     )
     pairs["gap"] = pairs["spearman"] - pairs["pearson"]
+    pairs = pairs.dropna(subset=["pearson", "spearman"])  # a constant feature has no correlation
+    if pairs.empty:
+        entry = {
+            "title": "Customer features: Pearson vs Spearman correlation, covariance",
+            "data": "features_full",
+            "n": int(len(X)),
+            "conclusion": "Not enough variation in the features to compute correlations.",
+        }
+        return entry, long
     strong = pairs.loc[pairs["spearman"].abs().idxmax()]
     gaps = pairs.reindex(pairs["gap"].abs().sort_values(ascending=False).index)
     worst = gaps.iloc[0]

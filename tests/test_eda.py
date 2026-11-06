@@ -70,6 +70,14 @@ def test_pareto_curve(eda_out):
     assert summary["top_20pct_revenue_share"] == pytest.approx(top20)
 
 
+def test_run_on_data_without_a_full_month(synthetic_shop):
+    s = synthetic_shop.sales
+    short = s[(s["invoice_date"] >= "2011-03-05") & (s["invoice_date"] < "2011-03-20")]
+    full = build_features(short, synthetic_shop.returns, full_cutoff(short))
+    _, summary = eda.run(full, short)  # every month is partial -> falls back to all months
+    assert summary["peak_month"] == "2011-03-01"
+
+
 def test_gini_extremes():
     _, equal = eda.pareto(np.full(100, 5.0))
     assert equal["gini"] == pytest.approx(0.0, abs=1e-9)

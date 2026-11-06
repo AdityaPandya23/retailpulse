@@ -33,6 +33,8 @@ from retailpulse.config import SEED
 from retailpulse.features import log1p_skewed
 
 N_CUSTOMERS = 40
+# Placeholder for the fake data only. TODO(human): the real k and segment names are chosen in
+# P3 from the k-selection evidence (silhouette / elbow / DB / CH in k_selection.parquet).
 K = 4
 FIRST_ID = 900001
 SEGMENT_NAMES = [f"Mock segment {c}" for c in "ABCD"]
