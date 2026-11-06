@@ -11,3 +11,29 @@ stats:
 data:
   url: "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
   xlsx_name: "online_retail_II.xlsx"
+
+# ---- P3 models ----
+segment:
+  # K-Means inputs (return_rate is zero-inflated; non_uk_share would make the segment x UK
+  # chi-square circular -> both are excluded from clustering but kept in the profiles)
+  features: [recency, frequency, monetary, tenure, avg_basket_value,
+             mean_interpurchase_days, n_distinct_products]
+  k_range: [2, 10]          # k scanned for the elbow / silhouette / DB / CH table
+  k_choice_range: [3, 7]    # k considered by the automatic choice rule (+ ARI stability)
+  k: null                   # null = automatic rule; set an int to override
+  names: {}                 # {} = automatic naming rule; override e.g. {0: "Champions", 1: ...}
+
+predict:
+  train_offset_days: 90     # train snapshot = cutoff - 90 days (labels end at the real cutoff)
+  cv_folds: 5
+  knn_k_max: 100
+  qda_reg_param: 0.01
+
+rules:
+  top_n_products: 500
+  min_support: 0.01
+  min_abs_invoices: 30      # support floor = max(min_support, min_abs_invoices / n_invoices)
+  min_confidence: 0.3
+  max_len: 3
+  max_rules_per_scope: 200
+  n_recommend: 5

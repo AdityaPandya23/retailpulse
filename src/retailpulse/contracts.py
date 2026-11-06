@@ -10,6 +10,7 @@ import json
 import math
 import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -178,6 +179,13 @@ PR_COLUMNS = ["model", "recall", "precision", "threshold"]
 KNN_CURVE_COLUMNS = ["k", "train_error", "test_error"]
 REGRESSION_COLUMNS = ["customer_id", "model", "split", "y_true", "y_pred"]  # log1p(next_spend)
 
+# ---- fitted sklearn pipelines (joblib) for the P4 What-if sliders; not mocked ----
+MODELS_DIR = ARTIFACTS_DIR / "models"
+SEGMENT_MODEL_JOBLIB = MODELS_DIR / "segment_model.joblib"  # log1p -> scaler -> kmeans
+CLASSIFIER_JOBLIB = MODELS_DIR / "classifier.joblib"  # best classifier: p_return
+REGRESSOR_JOBLIB = MODELS_DIR / "regressor.joblib"  # best regressor: log1p(next_spend | return)
+MODEL_JOBLIBS = (SEGMENT_MODEL_JOBLIB, CLASSIFIER_JOBLIB, REGRESSOR_JOBLIB)
+
 RULES_DIR = ARTIFACTS_DIR / "rules"
 RULES_PARQUET = RULES_DIR / "rules.parquet"
 RECOMMENDATIONS_PARQUET = RULES_DIR / "recommendations.parquet"
@@ -334,11 +342,61 @@ def read_metrics(path: Path = METRICS_JSON) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
-def update_metrics(section: str, payload: dict, path: Path = METRICS_JSON) -> None:
-    """Replace one section of metrics.json, keeping the sections other stages wrote."""
-    metrics = read_metrics(path)
-    metrics[section] = payload
-    write_json(path, metrics)
+class MetricsLockTimeout(TimeoutError):
+    """Another process held the metrics.json lock for longer than the timeout."""
+
+
+@contextmanager
+def file_lock(path: Path, timeout: float = 60.0, poll: float = 0.05, stale_after: float = 300.0):
+    """Cross-process lock: `<path>.lock` created with O_CREAT | O_EXCL, removed in finally.
+
+    A lock file older than `stale_after` seconds (a killed process) is broken.
+    """
+    lock = Path(str(path) + ".lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            try:
+                if time.time() - lock.stat().st_mtime > stale_after:
+                    lock.unlink(missing_ok=True)
+                    continue
+            except FileNotFoundError:
+                continue  # released between open and stat: retry at once
+            if time.monotonic() > deadline:
+                raise MetricsLockTimeout(f"could not lock {path} within {timeout:.0f}s") from None
+            time.sleep(poll)
+        except PermissionError:  # Windows: lock file is being deleted right now
+            if time.monotonic() > deadline:
+                raise MetricsLockTimeout(f"could not lock {path} within {timeout:.0f}s") from None
+            time.sleep(poll)
+    try:
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        yield
+    finally:
+        for attempt in range(5):
+            try:
+                lock.unlink(missing_ok=True)
+                break
+            except PermissionError:
+                time.sleep(0.05 * (attempt + 1))
+
+
+def update_metrics(
+    section: str, payload: dict, path: Path = METRICS_JSON, timeout: float = 60.0
+) -> None:
+    """Replace one section of metrics.json, keeping the sections other stages wrote.
+
+    Read-modify-write runs under a lock file, so parallel stages never lose a section.
+    """
+    with file_lock(Path(path), timeout=timeout):
+        metrics = read_metrics(path)
+        metrics[section] = payload
+        write_json(path, metrics)
 
 
 def has_metrics(sections: tuple[str, ...] | list[str], path: Path = METRICS_JSON) -> bool:
