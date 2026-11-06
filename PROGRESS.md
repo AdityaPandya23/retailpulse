@@ -111,7 +111,32 @@
 - Pins = the .venv versions (sklearn 1.9.1, numpy 2.5.4 also pinned: pickled models); change only with a rerun.
 - Customer timeline keeps its log axis (PLAN rule "log where skewed"); demo avoids extreme single-slider what-ifs.
 
+## P6a Simplified backend — done (2026-11-07)
+- Backend only for an easy-to-explain demo (old app = tag v1-full; new app = P6b). config.yaml: segment + predict features =
+  recency, frequency, monetary, tenure, avg_basket_value, n_distinct_products; predict.models = logistic, knn, naive_bayes;
+  rules.per_segment = false. contracts: ALL_CLASSIFIERS (5, keeps palette colours) / CLASSIFIERS = the 3 configured.
+- New: models/classifiers.joblib (3 pipelines + train thresholds); PCA(3) in segment_model.joblib (`cluster.pca_coords`
+  places a new customer, = pc1–3 exactly); `rules.recommend_from_basket` (overall rules, reason = strongest fired rule,
+  best-seller fill, never basket items); eda/sample_rows (5 seeded lines), rules/products (top 500 = every rule item),
+  segments/presets (per-segment medians of the 6). All mocked; .gitignore regenerated: 37 app files, ≈3.0 MB.
+- Rerun eda, mock, segment, predict, rules, app_data (`--only` already forced reruns: no pipeline change). Ingest untouched.
+- Segments: **k = 3** by rule (silhouette 0.287, no k within 0.02; DB 1.29, ARI 0.99): 0 Champions 40% customers / 88%
+  revenue · 1 Regulars 31% / 7.5% · 2 Lost / Hibernating 29% / 4.5%. RFM baseline silhouette 0.16, CV AUC 0.745 vs 0.716.
+- CV / test AUC: logistic 0.819/0.795 · naive_bayes 0.805/0.790 · **knn (k 75) 0.822/0.794** = best by train CV, threshold
+  0.35; knn vs logistic +0.003, p 0.30 → tied. Backtest: 1,942 predicted, 72.7% returned vs base 43.2% (lift 1.68,
+  recall 62%; top decile 91%, bottom 11%). Hidden regression: multiple_lr, test RMSE 0.83.
+- Rules: 200 overall (top POPPY'S PLAYHOUSE BEDROOM → LIVINGROOM, lift 54.9). Hit-rate@5 22.4% vs 16.1% best sellers
+  (2,194 customers; 25.3% with segment rules). Tests: 245 pass (+7), leakage tests pass. Ruff clean.
+
+## P6a decisions
+- **k and segment names: chosen automatically by the existing metric rule (user decision 2026-11-07), no TODO(human).**
+  config.yaml segment.k / segment.names can still override.
+- Presets = per-feature medians (typical, not a real customer). Basket "popular" rows: score NaN, no reason. A basket has
+  no segment → only "overall" rules. Rules stage keeps segments.parquet as input so per_segment: true still works.
+- Mock segmentation uses segment.features (mock presets fit the mock models); mock rules are overall-only.
+- Old app still passes its AppTests (3 models now); README / DEMO_SCRIPT numbers are stale until P6b.
+- Next: P6b simplified app on these artifacts (presets, PCA placement, basket picker), then README / DEMO_SCRIPT.
+
 ## Open items (human)
-1. Confirm / override `segment.k` and `segment.names` in config.yaml → `python -m retailpulse.pipeline` → commit artifacts.
-2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
-3. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once.
+1. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
+2. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once.

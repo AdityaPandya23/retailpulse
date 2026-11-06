@@ -137,9 +137,7 @@ def run_cube() -> dict:
 
 def run_eda() -> dict:
     full = pd.read_parquet(C.FEATURES_FULL_PARQUET)
-    sales = pd.read_parquet(
-        C.SALES_PARQUET, columns=["invoice", "invoice_date", "customer_id", "country", "line_value"]
-    )
+    sales = pd.read_parquet(C.SALES_PARQUET, columns=C.SALES_COLUMNS)  # all: sample rows
     tables, summary = eda_mod.run(full, sales)
     for path, df in tables.items():
         _write_parquet(df, path)

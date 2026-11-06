@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
@@ -68,6 +69,12 @@ def predict_segment(model: dict, raw: pd.DataFrame) -> np.ndarray:
     """Saved model dict + raw feature rows -> segment ids (0 = most valuable)."""
     labels = model["pipeline"].predict(raw[model["features"]])
     return np.array([model["label_to_segment"][int(lab)] for lab in labels], dtype="int64")
+
+
+def pca_coords(model: dict, raw: pd.DataFrame) -> np.ndarray:
+    """Saved model dict + raw feature rows -> (n, 3) coordinates on the pc1-pc3 scatter."""
+    scaled = model["pipeline"][:-1].transform(raw[model["features"]])  # log1p -> scaler
+    return model["pca"].transform(scaled)
 
 
 # ---------------- choosing k ----------------
@@ -335,6 +342,11 @@ def segment_customers(
         }
     )
     profiles = _profiles(f, segment, names, y)
+    # one "typical customer" per segment (median of each raw model input) for the app's presets
+    presets = f[C.PRESET_FEATURES].groupby(segment).median().rename_axis("segment").reset_index()
+    presets.insert(1, "segment_name", [names[s] for s in presets["segment"]])
+    # same scaled X as pc1-pc3 (equal to the full PCA's first 3 components)
+    pca = PCA(n_components=min(3, len(feats)), random_state=seed).fit(X)
 
     top = profiles.iloc[0]
     ari = ari_by_k[k]
@@ -407,11 +419,13 @@ def segment_customers(
         "features": feats,
         "label_to_segment": label_to_segment,
         "segment_names": names,
+        "pca": pca,  # PCA(3) on the scaled features: pca_coords() places a new customer
     }
     tables = {
         C.SEGMENTS_PARQUET: segments,
         C.SEGMENT_PROFILES_PARQUET: profiles,
         C.K_SELECTION_PARQUET: k_sel,
         C.PCA_LOADINGS_PARQUET: loadings,
+        C.SEGMENT_PRESETS_PARQUET: presets,
     }
     return SegmentationResult(tables=tables, metrics=metrics, model=model, extras={"X": X})

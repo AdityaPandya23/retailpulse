@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from retailpulse.config import ARTIFACTS_DIR, PROCESSED_DIR, RAW_DIR, XLSX_NAME
+from retailpulse.config import ARTIFACTS_DIR, PREDICT, PROCESSED_DIR, RAW_DIR, SEGMENT, XLSX_NAME
 
 # ---- data layer (large, never deployed) ----
 RAW_ZIP = RAW_DIR / "online_retail_ii.zip"
@@ -102,6 +102,8 @@ EDA_MONTHLY_PARQUET = EDA_DIR / "monthly.parquet"
 EDA_COUNTRIES_PARQUET = EDA_DIR / "countries.parquet"
 EDA_PARETO_PARQUET = EDA_DIR / "pareto.parquet"
 EDA_COHORTS_PARQUET = EDA_DIR / "cohorts.parquet"
+EDA_SAMPLE_ROWS_PARQUET = EDA_DIR / "sample_rows.parquet"  # 5 cleaned sales lines (seeded)
+SAMPLE_ROWS_COLUMNS = SALES_COLUMNS
 HISTOGRAM_COLUMNS = ["feature", "bin", "left", "right", "mid", "count", "scale"]
 BOXPLOT_COLUMNS = [
     "feature",
@@ -136,6 +138,10 @@ SEGMENTS_PARQUET = SEGMENTS_DIR / "segments.parquet"  # one row per customer
 SEGMENT_PROFILES_PARQUET = SEGMENTS_DIR / "profiles.parquet"  # one row per segment
 K_SELECTION_PARQUET = SEGMENTS_DIR / "k_selection.parquet"  # one row per k
 PCA_LOADINGS_PARQUET = SEGMENTS_DIR / "pca_loadings.parquet"  # one row per feature
+SEGMENT_PRESETS_PARQUET = SEGMENTS_DIR / "presets.parquet"  # one row per segment: median customer
+# raw model inputs a preset fills (segment model + classifiers), in FEATURE_COLUMNS order
+PRESET_FEATURES = [c for c in FEATURE_COLUMNS if c in SEGMENT.features or c in PREDICT.features]
+SEGMENT_PRESETS_COLUMNS = ["segment", "segment_name", *PRESET_FEATURES]
 SEGMENTS_COLUMNS = [
     "customer_id",
     "segment",
@@ -164,7 +170,12 @@ ROC_PARQUET = PREDICTIONS_DIR / "roc_curves.parquet"
 PR_PARQUET = PREDICTIONS_DIR / "pr_curves.parquet"
 KNN_CURVE_PARQUET = PREDICTIONS_DIR / "knn_bias_variance.parquet"
 REGRESSION_PARQUET = PREDICTIONS_DIR / "regression.parquet"  # customer x model
-CLASSIFIERS = ["logistic", "lda", "qda", "naive_bayes", "knn"]
+ALL_CLASSIFIERS = ["logistic", "lda", "qda", "naive_bayes", "knn"]  # what classify.py can fit
+_UNKNOWN_MODELS = sorted(set(PREDICT.models) - set(ALL_CLASSIFIERS))
+if _UNKNOWN_MODELS:
+    raise ValueError(f"config.yaml predict.models has unknown classifiers: {_UNKNOWN_MODELS}")
+# trained + compared (config.yaml predict.models), always in ALL_CLASSIFIERS order
+CLASSIFIERS = [m for m in ALL_CLASSIFIERS if m in PREDICT.models]
 REGRESSORS = ["simple_lr", "multiple_lr", "knn"]
 CLASSIFICATION_COLUMNS = [
     "customer_id",
@@ -183,14 +194,18 @@ REGRESSION_COLUMNS = ["customer_id", "model", "split", "y_true", "y_pred"]  # lo
 MODELS_DIR = ARTIFACTS_DIR / "models"
 SEGMENT_MODEL_JOBLIB = MODELS_DIR / "segment_model.joblib"  # log1p -> scaler -> kmeans
 CLASSIFIER_JOBLIB = MODELS_DIR / "classifier.joblib"  # best classifier: p_return
+# every CLASSIFIERS pipeline: {pipelines: {m: ...}, thresholds: {m: ...}, features, best_model}
+CLASSIFIERS_JOBLIB = MODELS_DIR / "classifiers.joblib"
 REGRESSOR_JOBLIB = MODELS_DIR / "regressor.joblib"  # best regressor: log1p(next_spend | return)
-MODEL_JOBLIBS = (SEGMENT_MODEL_JOBLIB, CLASSIFIER_JOBLIB, REGRESSOR_JOBLIB)
+MODEL_JOBLIBS = (SEGMENT_MODEL_JOBLIB, CLASSIFIER_JOBLIB, CLASSIFIERS_JOBLIB, REGRESSOR_JOBLIB)
 
 RULES_DIR = ARTIFACTS_DIR / "rules"
 RULES_PARQUET = RULES_DIR / "rules.parquet"
 RECOMMENDATIONS_PARQUET = RULES_DIR / "recommendations.parquet"
+PRODUCTS_PARQUET = RULES_DIR / "products.parquet"  # top products by invoices (= rule universe)
 RULES_COLUMNS = ["scope", "antecedents", "consequents", "support", "confidence", "lift"]
 RECOMMENDATIONS_COLUMNS = ["customer_id", "rank", "stock_code", "description", "score"]
+PRODUCTS_COLUMNS = ["stock_code", "description", "n_invoices"]  # best sellers first
 
 # ======================= P4: app data (the deployed app never reads data/) =======================
 CUSTOMERS_DIR = ARTIFACTS_DIR / "customers"
@@ -249,10 +264,12 @@ PARQUET_CONTRACTS: dict[Path, list[str]] = {
     EDA_COUNTRIES_PARQUET: COUNTRY_COLUMNS,
     EDA_PARETO_PARQUET: PARETO_COLUMNS,
     EDA_COHORTS_PARQUET: COHORT_COLUMNS,
+    EDA_SAMPLE_ROWS_PARQUET: SAMPLE_ROWS_COLUMNS,
     SEGMENTS_PARQUET: SEGMENTS_COLUMNS,
     SEGMENT_PROFILES_PARQUET: SEGMENT_PROFILE_COLUMNS,
     K_SELECTION_PARQUET: K_SELECTION_COLUMNS,
     PCA_LOADINGS_PARQUET: PCA_LOADINGS_COLUMNS,
+    SEGMENT_PRESETS_PARQUET: SEGMENT_PRESETS_COLUMNS,
     CLASSIFICATION_PARQUET: CLASSIFICATION_COLUMNS,
     ROC_PARQUET: ROC_COLUMNS,
     PR_PARQUET: PR_COLUMNS,
@@ -260,6 +277,7 @@ PARQUET_CONTRACTS: dict[Path, list[str]] = {
     REGRESSION_PARQUET: REGRESSION_COLUMNS,
     RULES_PARQUET: RULES_COLUMNS,
     RECOMMENDATIONS_PARQUET: RECOMMENDATIONS_COLUMNS,
+    PRODUCTS_PARQUET: PRODUCTS_COLUMNS,
     TIMELINE_PARQUET: TIMELINE_COLUMNS,
     REC_REASONS_PARQUET: REC_REASONS_COLUMNS,
 }
@@ -270,6 +288,7 @@ EDA_OUTPUTS = (
     EDA_COUNTRIES_PARQUET,
     EDA_PARETO_PARQUET,
     EDA_COHORTS_PARQUET,
+    EDA_SAMPLE_ROWS_PARQUET,
 )
 
 # ---- mock: same relative paths under artifacts/mock/ (tracked in git, tiny, synthetic) ----
@@ -282,6 +301,7 @@ MOCKED_PARQUETS = (
     SEGMENT_PROFILES_PARQUET,
     K_SELECTION_PARQUET,
     PCA_LOADINGS_PARQUET,
+    SEGMENT_PRESETS_PARQUET,
     CLASSIFICATION_PARQUET,
     ROC_PARQUET,
     PR_PARQUET,
@@ -289,6 +309,7 @@ MOCKED_PARQUETS = (
     REGRESSION_PARQUET,
     RULES_PARQUET,
     RECOMMENDATIONS_PARQUET,
+    PRODUCTS_PARQUET,
     # P4: everything else the app reads, so the whole app runs on mock data (tests, CI)
     TIMELINE_PARQUET,
     REC_REASONS_PARQUET,

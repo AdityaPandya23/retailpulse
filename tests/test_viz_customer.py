@@ -75,8 +75,8 @@ def test_unknown_customer_is_handled(mock):
 
 def test_test_prediction_for_a_test_customer(mock):
     c = mock["classification"]
-    row = c[(c["split"] == "test") & (c["model"] == "lda")].iloc[0]
-    got = VCu.test_prediction(c, int(row["customer_id"]), "lda")
+    row = c[(c["split"] == "test") & (c["model"] == "naive_bayes")].iloc[0]
+    got = VCu.test_prediction(c, int(row["customer_id"]), "naive_bayes")
     assert got == {
         "p_return": pytest.approx(row["p_return"]),
         "pred_return": int(row["pred_return"]),

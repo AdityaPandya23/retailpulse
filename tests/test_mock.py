@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 
 from retailpulse import contracts as C
-from retailpulse.mock import FIRST_ID, build_mock
+from retailpulse.mock import FIRST_ID, build_mock, build_mock_models
+from retailpulse.segment.cluster import pca_coords, predict_segment
 
 
 @pytest.fixture(scope="module")
@@ -43,6 +44,22 @@ def test_mock_is_self_consistent(mock):
     profiles = tables[C.SEGMENT_PROFILES_PARQUET]
     assert profiles["n_customers"].sum() == len(ids)
     assert profiles["revenue_share"].sum() == pytest.approx(1.0)
+
+
+def test_mock_models_take_a_preset(mock):
+    """Every mock joblib (incl. classifiers.joblib) has the real layout and accepts a preset."""
+    tables, metrics = mock
+    models = build_mock_models(tables, metrics)
+    assert set(models) == set(C.MODEL_JOBLIBS)
+    presets = tables[C.SEGMENT_PRESETS_PARQUET]
+    seg_model = models[C.SEGMENT_MODEL_JOBLIB]
+    assert len(predict_segment(seg_model, presets)) == len(presets)
+    assert pca_coords(seg_model, presets).shape == (len(presets), 3)
+    allc = models[C.CLASSIFIERS_JOBLIB]
+    assert list(allc["pipelines"]) == list(allc["thresholds"]) == C.CLASSIFIERS
+    assert allc["best_model"] == metrics["classify"]["best_model"]
+    for pipe in allc["pipelines"].values():
+        assert pipe.predict_proba(presets[allc["features"]]).shape == (len(presets), 2)
 
 
 def test_mock_is_deterministic(mock):

@@ -1,8 +1,8 @@
 """Segmentation stage (I/O only). Run: python -m retailpulse.segment.stage
 
 Inputs:  features_cutoff.parquet, labels.parquet, config.yaml (segment section, seed)
-Outputs: segments / profiles / k_selection / pca_loadings parquet, segment_model.joblib,
-         metrics.json section "segment"
+Outputs: segments / profiles / k_selection / pca_loadings / presets parquet,
+         segment_model.joblib (incl. PCA(3)), metrics.json section "segment"
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ OUTPUTS = (
     C.SEGMENT_PROFILES_PARQUET,
     C.K_SELECTION_PARQUET,
     C.PCA_LOADINGS_PARQUET,
+    C.SEGMENT_PRESETS_PARQUET,
     C.SEGMENT_MODEL_JOBLIB,
 )
 INPUTS = (C.FEATURES_CUTOFF_PARQUET, C.LABELS_PARQUET)

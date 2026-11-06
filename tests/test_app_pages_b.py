@@ -34,13 +34,12 @@ def test_predictions_runs_and_hides_outcome_until_reveal(run_app_page):
 
 def test_predictions_model_selectbox_and_knn_slider(run_app_page):
     at = run_app_page(PRED)
-    assert (
-        at.selectbox(key="cm_model").value
-        == C.read_metrics(C.mock_path(C.METRICS_JSON))["classify"]["best_model"]
-    )
-    at.selectbox(key="cm_model").set_value("qda").run()
+    best = C.read_metrics(C.mock_path(C.METRICS_JSON))["classify"]["best_model"]
+    assert at.selectbox(key="cm_model").value == best
+    other = next(m for m in C.CLASSIFIERS if m != best)
+    at.selectbox(key="cm_model").set_value(other).run()
     assert not at.exception, at.exception
-    assert any("**qda** flags" in m.value for m in at.markdown)
+    assert any(f"**{other}** flags" in m.value for m in at.markdown)
     at.slider(key="knn_k").set_value(7).run()
     assert not at.exception, at.exception
     assert any("At **k = 7**" in m.value for m in at.markdown)

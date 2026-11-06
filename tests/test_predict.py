@@ -12,7 +12,7 @@ import pytest
 from sklearn.neighbors import KNeighborsClassifier
 
 from retailpulse import contracts as C
-from retailpulse.config import CUTOFF, HORIZON_DAYS
+from retailpulse.config import CUTOFF, HORIZON_DAYS, PREDICT
 from retailpulse.features import build_features, build_labels, log1p_skewed
 from retailpulse.predict import classify, dataset, regress
 from retailpulse.predict.backtest import backtest, decile_table
@@ -111,7 +111,8 @@ def test_pipeline_takes_raw_frame_and_pickles(frames):
     pipe = classify.make_classifier("logistic").fit(train[dataset.FEATURES], train["returned_flag"])
     raw = test[dataset.FEATURES]
     # the pipeline logs internally: same transform as log1p_skewed -> scaler by hand
-    by_hand = pipe.named_steps["scale"].transform(log1p_skewed(raw.astype("float64")))
+    skewed = [c for c in C.SKEWED_FEATURES if c in raw.columns]
+    by_hand = pipe.named_steps["scale"].transform(log1p_skewed(raw.astype("float64"), skewed))
     np.testing.assert_allclose(pipe[:-1].transform(raw), by_hand)
     buf = io.BytesIO()
     joblib.dump(pipe, buf)
@@ -225,9 +226,27 @@ def test_contracts_and_metrics_keys(computed):
         assert isinstance(metrics[section]["conclusion"], str)
     assert set(models[C.CLASSIFIER_JOBLIB]) == {"pipeline", "features", "model", "threshold"}
     assert set(models[C.REGRESSOR_JOBLIB]) == {"pipeline", "features", "model", "target", "note"}
-    assert models[C.CLASSIFIER_JOBLIB]["features"] == C.FEATURE_COLUMNS
+    assert models[C.CLASSIFIER_JOBLIB]["features"] == dataset.FEATURES == list(PREDICT.features)
     assert metrics["backtest"]["model"] == metrics["classify"]["best_model"]
     C.to_jsonable(metrics)  # JSON-serialisable
+
+
+def test_classifiers_joblib_reproduces_every_model(computed, frames):
+    _, test, _, _ = frames
+    tables, metrics, models = computed
+    buf = io.BytesIO()
+    joblib.dump(models[C.CLASSIFIERS_JOBLIB], buf)
+    buf.seek(0)
+    saved = joblib.load(buf)
+    assert set(saved) == {"pipelines", "thresholds", "features", "best_model"}
+    assert list(saved["pipelines"]) == C.CLASSIFIERS and saved["features"] == dataset.FEATURES
+    assert saved["best_model"] == metrics["classify"]["best_model"]
+    cls = tables[C.CLASSIFICATION_PARQUET]
+    for m, pipe in saved["pipelines"].items():
+        assert saved["thresholds"][m] == metrics["classify"]["models"][m]["threshold"]
+        rows = cls[(cls["model"] == m) & (cls["split"] == "test")]
+        p = pipe.predict_proba(test[saved["features"]])[:, 1]  # raw features in
+        np.testing.assert_allclose(p, rows["p_return"].to_numpy())
 
 
 def test_regressor_unknown_name():

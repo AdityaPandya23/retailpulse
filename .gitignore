@@ -33,6 +33,7 @@ artifacts/eda/*
 !artifacts/eda/histograms.parquet
 !artifacts/eda/monthly.parquet
 !artifacts/eda/pareto.parquet
+!artifacts/eda/sample_rows.parquet
 !artifacts/features/
 artifacts/features/*
 !artifacts/features/features_cutoff.parquet
@@ -41,6 +42,7 @@ artifacts/features/*
 !artifacts/models/
 artifacts/models/*
 !artifacts/models/classifier.joblib
+!artifacts/models/classifiers.joblib
 !artifacts/models/regressor.joblib
 !artifacts/models/segment_model.joblib
 !artifacts/predictions/
@@ -58,12 +60,14 @@ artifacts/quality/*
 !artifacts/quality/warehouse_summary.json
 !artifacts/rules/
 artifacts/rules/*
+!artifacts/rules/products.parquet
 !artifacts/rules/recommendations.parquet
 !artifacts/rules/rules.parquet
 !artifacts/segments/
 artifacts/segments/*
 !artifacts/segments/k_selection.parquet
 !artifacts/segments/pca_loadings.parquet
+!artifacts/segments/presets.parquet
 !artifacts/segments/profiles.parquet
 !artifacts/segments/segments.parquet
 !artifacts/stats/

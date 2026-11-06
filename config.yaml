@@ -14,16 +14,18 @@ data:
 
 # ---- P3 models ----
 segment:
-  # K-Means inputs (return_rate is zero-inflated; non_uk_share would make the segment x UK
-  # chi-square circular -> both are excluded from clustering but kept in the profiles)
-  features: [recency, frequency, monetary, tenure, avg_basket_value,
-             mean_interpurchase_days, n_distinct_products]
+  # K-Means inputs: the 6 easy-to-explain features (P6a). Excluded but kept in the profiles:
+  # mean_interpurchase_days (~ tenure / frequency), return_rate (zero-inflated), non_uk_share
+  # (would make the segment x UK chi-square circular)
+  features: [recency, frequency, monetary, tenure, avg_basket_value, n_distinct_products]
   k_range: [2, 10]          # k scanned for the elbow / silhouette / DB / CH table
   k_choice_range: [3, 7]    # k considered by the automatic choice rule (+ ARI stability)
   k: null                   # null = automatic rule; set an int to override
   names: {}                 # {} = automatic naming rule; override e.g. {0: "Champions", 1: ...}
 
 predict:
+  features: [recency, frequency, monetary, tenure, avg_basket_value, n_distinct_products]
+  models: [logistic, knn, naive_bayes]   # trained + compared (subset of contracts.ALL_CLASSIFIERS)
   train_offset_days: 90     # train snapshot = cutoff - 90 days (labels end at the real cutoff)
   cv_folds: 5
   knn_k_max: 100
@@ -37,3 +39,4 @@ rules:
   max_len: 3
   max_rules_per_scope: 200
   n_recommend: 5
+  per_segment: false        # false = overall rules + overall best sellers only (no segment scopes)

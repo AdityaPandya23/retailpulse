@@ -1,7 +1,8 @@
 """Small aggregate tables for the EDA charts (data, not images).
 
 histograms / frequency polygons, box plots, monthly sales & orders, country revenue,
-customer revenue concentration (Pareto / Lorenz) and the cohort retention matrix.
+customer revenue concentration (Pareto / Lorenz), the cohort retention matrix and a few
+sample rows ("what one cleaned sales line looks like").
 Descriptive only: built from all sales and features_full.
 """
 
@@ -13,8 +14,10 @@ import numpy as np
 import pandas as pd
 
 from retailpulse import contracts as C
+from retailpulse.config import SEED
 from retailpulse.features import UK
 
+N_SAMPLE_ROWS = 5
 N_BINS = 30
 PARETO_POINTS = 201  # customer share 0, 0.5%, ..., 100%
 BOX_GROUPS = ("all", "one-time", "repeat")
@@ -175,8 +178,19 @@ def cohorts(sales: pd.DataFrame) -> pd.DataFrame:
     return C.validate(out[C.COHORT_COLUMNS], C.EDA_COHORTS_PARQUET)
 
 
+def sample_rows(sales: pd.DataFrame, n: int = N_SAMPLE_ROWS, seed: int = SEED) -> pd.DataFrame:
+    """n random cleaned sales lines (seeded), oldest first, in the cleaned column order."""
+    C.require_columns(sales, C.SAMPLE_ROWS_COLUMNS, "sales")
+    rows = sales[C.SAMPLE_ROWS_COLUMNS].sample(n=min(n, len(sales)), random_state=seed)
+    rows = rows.sort_values(["invoice_date", "invoice", "stock_code"]).reset_index(drop=True)
+    return C.validate(rows, C.EDA_SAMPLE_ROWS_PARQUET)
+
+
 def run(features_full: pd.DataFrame, sales: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dict]:
-    """All EDA tables (keyed by artifact path) + a headline summary for metrics.json."""
+    """All EDA tables (keyed by artifact path) + a headline summary for metrics.json.
+
+    `sales` needs the cleaned columns (C.SALES_COLUMNS) for the sample rows.
+    """
     pareto_df, conc = pareto(features_full["monetary"])
     monthly_df, countries_df = monthly(sales), countries(sales)
     tables = {
@@ -186,6 +200,7 @@ def run(features_full: pd.DataFrame, sales: pd.DataFrame) -> tuple[dict[Path, pd
         C.EDA_COUNTRIES_PARQUET: countries_df,
         C.EDA_PARETO_PARQUET: pareto_df,
         C.EDA_COHORTS_PARQUET: cohorts(sales),
+        C.EDA_SAMPLE_ROWS_PARQUET: sample_rows(sales),
     }
     full_months = monthly_df.loc[~monthly_df["is_partial"]]
     candidates = full_months if len(full_months) else monthly_df  # short ranges: all partial

@@ -105,12 +105,13 @@ def test_decile_chart_has_ten_bars_and_base_rate(mock):
 
 
 # ---------------- ROC / PR ----------------
-def test_roc_has_five_models_plus_chance(mock):
+def test_roc_has_every_model_plus_chance(mock):
     fig = VP.roc_figure(mock["roc"], mock["cls"])
-    assert len(fig.data) == 6
+    n = len(C.CLASSIFIERS)
+    assert len(fig.data) == n + 1
     names = [d.name for d in fig.data]
     assert names[-1].startswith("chance")
-    for m, d in zip(C.CLASSIFIERS, fig.data[:5], strict=True):
+    for m, d in zip(C.CLASSIFIERS, fig.data[:n], strict=True):
         assert d.name.startswith(m) and "AUC" in d.name
         assert d.line.color == P.CLASSIFIER_COLOURS[m] and d.line.dash == P.CLASSIFIER_DASH[m]
     best = mock["cls"]["best_model"]
@@ -130,8 +131,8 @@ def test_pr_drops_inf_thresholds_and_has_baseline(mock):
         ]
     )
     fig = VP.pr_figure(pr, mock["cls"], 0.4)
-    assert len(fig.data) == 6 and fig.data[-1].y == (0.4, 0.4)
-    for d in fig.data[:5]:
+    assert len(fig.data) == len(C.CLASSIFIERS) + 1 and fig.data[-1].y == (0.4, 0.4)
+    for d in fig.data[:-1]:
         assert np.isfinite(np.asarray(d.customdata, dtype=float)).all()
     assert not VP.pr_figure(None, mock["cls"], 0.4).data
 
@@ -173,14 +174,14 @@ def test_tie_note_from_numbers():
 
 # ---------------- confusion ----------------
 def test_confusion_counts_sum_to_n(mock):
-    t = VP.test_predictions(mock["classification"], "lda")
+    t = VP.test_predictions(mock["classification"], "naive_bayes")
     cm = VP.confusion_counts(t)
-    assert cm.shape == (2, 2) and cm.to_numpy().sum() == len(t)
+    assert len(t) and cm.shape == (2, 2) and cm.to_numpy().sum() == len(t)
     hand = VP.confusion_counts(_hand_test())
     assert (
         hand.loc[1, 1] == 2 and hand.loc[0, 1] == 1 and hand.loc[1, 0] == 1 and hand.loc[0, 0] == 2
     )
-    fig = VP.confusion_figure(t, "lda", 0.5)
+    fig = VP.confusion_figure(t, "naive_bayes", 0.5)
     assert isinstance(fig.data[0], go.Heatmap) and len(fig.layout.annotations) == 4
     assert np.allclose(np.asarray(fig.data[0].z).sum(axis=1), 1.0)  # row %
 

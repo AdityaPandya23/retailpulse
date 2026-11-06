@@ -14,9 +14,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 from retailpulse import contracts as C
+from retailpulse.config import PREDICT
 from retailpulse.features import build_features, build_labels, log1p_skewed
 
-FEATURES: list[str] = list(C.FEATURE_COLUMNS)
+FEATURES: list[str] = list(PREDICT.features)  # config.yaml predict.features (raw values in)
+if not set(FEATURES) <= set(C.FEATURE_COLUMNS):
+    raise ValueError(f"predict.features must be feature columns: {FEATURES}")
 TARGET = "returned_flag"
 
 

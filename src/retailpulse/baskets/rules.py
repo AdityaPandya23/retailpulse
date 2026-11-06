@@ -15,6 +15,10 @@ Recommendations (per customer, n items, never an already-bought product):
   2. filled with the segment's best sellers (else overall) not yet bought; score = the
      product's support in that scope (share of invoices containing it), always ranked after
      rule-based items. `source` says which: "rule" | "popular".
+
+Basket recommendations (recommend_from_basket, for products picked in the app): the same rule
+score over the "overall" rules, plus the reason = the strongest fired rule (antecedents,
+confidence, lift); filled with best sellers; never an item already in the basket.
 """
 
 from __future__ import annotations
@@ -43,6 +47,16 @@ RULE_COLUMNS = [
     "min_support",
 ]
 REC_COLUMNS = ["customer_id", "rank", "stock_code", "description", "score", "source"]
+BASKET_REC_COLUMNS = [
+    "rank",
+    "stock_code",
+    "description",
+    "score",  # sum of confidence x lift of the fired rules; NaN for "popular"
+    "source",  # "rule" | "popular"
+    "antecedents",  # reason = strongest fired rule (None for "popular")
+    "confidence",
+    "lift",
+]
 
 
 def segment_scope(name) -> str:
@@ -80,6 +94,22 @@ def popularity(lines: pd.DataFrame) -> pd.Series:
     n = lines.groupby("stock_code")["invoice"].nunique().rename("n_invoices")
     df = n.reset_index().sort_values(["n_invoices", "stock_code"], ascending=[False, True])
     return df.set_index("stock_code")["n_invoices"]
+
+
+def product_table(
+    lines: pd.DataFrame, top_n: int = RULES.top_n_products, desc: pd.Series | None = None
+) -> pd.DataFrame:
+    """Top-n products by invoice count (the overall rule universe), best sellers first."""
+    desc = descriptions(lines) if desc is None else desc
+    pop = popularity(lines).head(top_n)
+    codes = [str(c) for c in pop.index]
+    return pd.DataFrame(
+        {
+            "stock_code": codes,
+            "description": [str(desc.get(c, c)) for c in codes],
+            "n_invoices": pop.to_numpy(dtype="int64"),
+        }
+    )
 
 
 def basket_matrix(lines: pd.DataFrame, products) -> pd.DataFrame:
@@ -343,6 +373,81 @@ def recommend(
 ) -> pd.DataFrame:
     """Top-n products the customer has not bought yet (see module docstring for the scoring)."""
     return recommend_all(lines, rules, [customer_id], segments, n)
+
+
+def recommend_from_basket(
+    codes, rules: pd.DataFrame | None, popularity, n: int = RULES.n_recommend
+) -> pd.DataFrame:
+    """Top-n products for a basket of stock codes, never one already in the basket.
+
+    rules: rules.parquet-like frame; only the "overall" scope is used (a basket has no segment).
+    popularity: products.parquet-like frame (stock_code, n_invoices[, description]) or a
+    Series stock_code -> n_invoices (popularity()). Rule items rank by score = sum of
+    confidence x lift (_rule_scores), their reason is the strongest fired rule; the rest are
+    best sellers ("popular", score NaN, no reason). Returns BASKET_REC_COLUMNS.
+    """
+    basket = {str(c) for c in codes}
+    lookup: dict[str, str] = {}
+    if isinstance(popularity, pd.DataFrame):
+        products = popularity.assign(stock_code=popularity["stock_code"].astype(str))
+        if "description" in products.columns:
+            lookup = dict(
+                zip(products["stock_code"], products["description"].astype(str), strict=True)
+            )
+        pop = products.set_index("stock_code")["n_invoices"]
+    else:
+        pop = pd.Series(popularity, dtype="float64")
+        pop.index = pop.index.astype(str)
+    order = sorted(pop.index, key=lambda c: (-float(pop[c]), c))  # best sellers first
+    pop_rank = {c: i for i, c in enumerate(order)}
+
+    r = pd.DataFrame(columns=RULE_COLUMNS) if rules is None else rules
+    if not r.empty and "scope" in r.columns:
+        r = r[r["scope"] == OVERALL]
+    r = r.reset_index(drop=True)
+    scores = _rule_scores(r, np.array([0]), {0: basket}).get(0, {}) if not r.empty else {}
+
+    # reason: the strongest (confidence x lift) fired rule whose consequents hold the item
+    reason: dict[str, int] = {}
+    if scores:
+        weight = (r["confidence"] * r["lift"]).to_numpy(dtype="float64")
+        for i in np.argsort(-weight, kind="stable"):
+            if not set(_codes(r.at[i, "antecedent_codes"])) <= basket:
+                continue
+            for item in _codes(r.at[i, "consequent_codes"]):
+                if item in scores:
+                    reason.setdefault(item, int(i))
+
+    ranked = sorted(scores, key=lambda c: (-scores[c], pop_rank.get(c, len(pop_rank)), c))
+    picks = [(c, scores[c], "rule") for c in ranked[:n]]
+    chosen = {c for c, _, _ in picks}
+    for c in order:
+        if len(picks) >= n:
+            break
+        if c not in basket and c not in chosen:
+            picks.append((c, float("nan"), "popular"))
+            chosen.add(c)
+
+    ante_col = "antecedents" if "antecedents" in r.columns else "antecedent_codes"
+    rows = []
+    for rank, (code, score, source) in enumerate(picks, start=1):
+        i = reason.get(code)
+        rows.append(
+            (
+                rank,
+                code,
+                lookup.get(code, code),
+                score,
+                source,
+                None if i is None else str(r.at[i, ante_col]),
+                float("nan") if i is None else float(r.at[i, "confidence"]),
+                float("nan") if i is None else float(r.at[i, "lift"]),
+            )
+        )
+    out = pd.DataFrame(rows, columns=BASKET_REC_COLUMNS)
+    return out.astype(
+        {"rank": "int64", "score": "float64", "confidence": "float64", "lift": "float64"}
+    )
 
 
 def hit_rate(recs: pd.DataFrame, before: pd.DataFrame, window: pd.DataFrame, k: int = 5) -> dict:

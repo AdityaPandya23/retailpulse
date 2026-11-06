@@ -42,11 +42,12 @@ SURFACE = "#FFFFFF"
 SEGMENT_COLOURS: tuple[str, ...] = (BLUE, ORANGE, GREEN, PINK, SKY, VERMILLION, YELLOW)
 OTHER_COLOUR = GREY  # segment id >= 7 (only with a config override k > 7): never a new hue
 
+# keyed by ALL_CLASSIFIERS (not the configured subset) so a model keeps its colour + dash
 CLASSIFIER_COLOURS: dict[str, str] = dict(
-    zip(C.CLASSIFIERS, (BLUE, ORANGE, GREEN, PINK, VERMILLION), strict=True)
+    zip(C.ALL_CLASSIFIERS, (BLUE, ORANGE, GREEN, PINK, VERMILLION), strict=True)
 )
 CLASSIFIER_DASH: dict[str, str] = dict(
-    zip(C.CLASSIFIERS, ("solid", "dash", "dot", "dashdot", "longdash"), strict=True)
+    zip(C.ALL_CLASSIFIERS, ("solid", "dash", "dot", "dashdot", "longdash"), strict=True)
 )
 REGRESSOR_COLOURS: dict[str, str] = dict(zip(C.REGRESSORS, (SKY, BLUE, VERMILLION), strict=True))
 REGRESSOR_DASH: dict[str, str] = dict(zip(C.REGRESSORS, ("dot", "solid", "longdash"), strict=True))

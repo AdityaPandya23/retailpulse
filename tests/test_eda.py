@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from retailpulse import contracts as C
@@ -76,6 +77,16 @@ def test_run_on_data_without_a_full_month(synthetic_shop):
     full = build_features(short, synthetic_shop.returns, full_cutoff(short))
     _, summary = eda.run(full, short)  # every month is partial -> falls back to all months
     assert summary["peak_month"] == "2011-03-01"
+
+
+def test_sample_rows_are_seeded_real_lines(eda_out, synthetic_shop):
+    _, tables, _ = eda_out
+    rows = tables[C.EDA_SAMPLE_ROWS_PARQUET]
+    assert list(rows.columns) == C.SALES_COLUMNS and len(rows) == eda.N_SAMPLE_ROWS == 5
+    assert rows["invoice_date"].is_monotonic_increasing
+    sales = synthetic_shop.sales
+    assert len(rows.merge(sales, on=C.SALES_COLUMNS)) >= 5  # unchanged lines of the input
+    pd.testing.assert_frame_equal(rows, eda.sample_rows(sales))  # same rows every run
 
 
 def test_gini_extremes():

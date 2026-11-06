@@ -153,6 +153,45 @@ def test_segment_rules_rank_first(lines):
     assert rec["stock_code"].tolist()[2] == B and rec["source"].tolist()[2] == "popular"
 
 
+def test_recommend_from_basket_by_hand(lines):
+    rules, _ = R.mine_rules(lines, **PARAMS)  # A->B (conf 4/6, lift 4/3) and B->A (conf 0.8)
+    products = R.product_table(lines)
+    rec = R.recommend_from_basket([A], rules, products, n=3)
+    assert list(rec.columns) == R.BASKET_REC_COLUMNS
+    assert rec["stock_code"].tolist() == [B, Cc, D]  # never A: it is already in the basket
+    assert rec["source"].tolist() == ["rule", "popular", "popular"]
+    top = rec.iloc[0]
+    assert top["description"] == "BETA PLATE" and top["antecedents"] == "ALPHA MUG"
+    assert top["score"] == pytest.approx((4 / 6) * (0.4 / 0.3))
+    assert top["confidence"] == pytest.approx(4 / 6) and top["lift"] == pytest.approx(0.4 / 0.3)
+    assert rec.loc[1:, "antecedents"].isna().all() and rec.loc[1:, "score"].isna().all()
+    # segment rules are ignored (a basket has no segment); a popularity Series works too
+    # (no descriptions there -> the code is shown)
+    a_rule = rules[rules["antecedent_codes"] == A]
+    seg_rule = a_rule.assign(scope="segment:Alpha", consequent_codes=D)
+    one = R.recommend_from_basket([A], pd.concat([rules, seg_rule]), R.popularity(lines), n=2)
+    assert one["stock_code"].tolist() == [B, Cc] and one["description"].tolist() == [B, Cc]
+    # basket fully covered -> best sellers outside it; no rules / empty basket -> best sellers
+    both = R.recommend_from_basket([A, B], rules, products, n=5)
+    assert both["stock_code"].tolist() == [Cc, D] and set(both["source"]) == {"popular"}
+    assert R.recommend_from_basket([], None, products, n=2)["stock_code"].tolist() == [A, B]
+
+
+def test_products_table_and_per_segment_switch():
+    sales = _sales(BASKETS)
+    off = dict(cutoff="2011-06-01", per_segment=False, **PARAMS)
+    tables, metrics = compute(sales, [1, 2, 3], SEGMENTS, **off)
+    prod = C.validate(tables[C.PRODUCTS_PARQUET], C.PRODUCTS_PARQUET)
+    assert prod["stock_code"].tolist() == [A, B, Cc, D]  # best sellers first; postage excluded
+    assert prod["n_invoices"].tolist() == [6, 5, 3, 1]
+    assert prod["description"].tolist() == [NAMES[c] for c in (A, B, Cc, D)]
+    assert R.product_table(R.product_lines(sales), top_n=2)["stock_code"].tolist() == [A, B]
+    # per_segment False (config default): segments are ignored -> overall scope only
+    assert metrics["n_rules"] == {"overall": 2} and metrics["per_segment"] is False
+    on = compute(sales, [1, 2, 3], SEGMENTS, cutoff="2011-06-01", per_segment=True, **PARAMS)
+    assert set(on[1]["n_rules"]) == {"overall", "segment:Alpha", "segment:Beta"}
+
+
 def test_hit_rate_by_hand():
     recs = pd.DataFrame(
         {
@@ -182,7 +221,7 @@ def shop_segments(synthetic_shop):
 def shop_result(synthetic_shop, shop_segments):
     sales = synthetic_shop.sales
     customers = R.product_lines(sales, end=CUTOFF)["customer_id"].unique()
-    params = dict(min_support=0.01, min_abs_invoices=3, min_confidence=0.1)
+    params = dict(min_support=0.01, min_abs_invoices=3, min_confidence=0.1, per_segment=True)
     return customers, compute(sales, customers, shop_segments, **params)
 
 
@@ -219,7 +258,7 @@ def test_shop_contracts_and_metrics(shop_result):
 def test_rules_ignore_rows_from_cutoff(synthetic_shop, shop_segments):
     sales = synthetic_shop.sales
     customers = R.product_lines(sales, end=CUTOFF)["customer_id"].unique()
-    params = dict(min_support=0.01, min_abs_invoices=3, min_confidence=0.1)
+    params = dict(min_support=0.01, min_abs_invoices=3, min_confidence=0.1, per_segment=True)
     late = sales[sales["invoice_date"] >= CUTOFF]
     noisy = pd.concat([sales[sales["invoice_date"] < CUTOFF], late, late.assign(invoice="X")])
     a, _ = compute(sales, customers, shop_segments, horizon_days=1, **params)

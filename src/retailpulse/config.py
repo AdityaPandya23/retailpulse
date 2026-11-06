@@ -41,6 +41,8 @@ class SegmentConfig:
 
 @dataclass(frozen=True)
 class PredictConfig:
+    features: tuple[str, ...]  # classifier + regressor inputs (raw; log1p/scale in the pipeline)
+    models: tuple[str, ...]  # classifiers trained + compared (subset of contracts.ALL_CLASSIFIERS)
     train_offset_days: int  # train snapshot cutoff = CUTOFF - train_offset_days
     cv_folds: int
     knn_k_max: int
@@ -56,6 +58,7 @@ class RulesConfig:
     max_len: int
     max_rules_per_scope: int
     n_recommend: int
+    per_segment: bool  # False = overall rules + overall best sellers only
 
 
 def _segment_config(d: dict) -> SegmentConfig:
@@ -70,6 +73,8 @@ def _segment_config(d: dict) -> SegmentConfig:
 
 SEGMENT: SegmentConfig = _segment_config(_CFG["segment"])
 PREDICT: PredictConfig = PredictConfig(
+    features=tuple(_CFG["predict"]["features"]),
+    models=tuple(_CFG["predict"]["models"]),
     train_offset_days=int(_CFG["predict"]["train_offset_days"]),
     cv_folds=int(_CFG["predict"]["cv_folds"]),
     knn_k_max=int(_CFG["predict"]["knn_k_max"]),
@@ -84,6 +89,7 @@ RULES: RulesConfig = RulesConfig(
     max_len=int(_R["max_len"]),
     max_rules_per_scope=int(_R["max_rules_per_scope"]),
     n_recommend=int(_R["n_recommend"]),
+    per_segment=bool(_R["per_segment"]),
 )
 
 DATA_URL: str = _CFG["data"]["url"]

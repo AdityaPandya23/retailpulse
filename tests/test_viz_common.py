@@ -29,9 +29,10 @@ def test_segment_names_fallback_to_profiles():
 
 
 def test_model_colours_and_dashes_are_unique():
-    assert set(P.CLASSIFIER_COLOURS) == set(C.CLASSIFIERS)
-    assert len(set(P.CLASSIFIER_COLOURS.values())) == len(C.CLASSIFIERS)
-    assert len(set(P.CLASSIFIER_DASH.values())) == len(C.CLASSIFIERS)
+    # keyed by every model classify.py can fit, so the configured subset keeps fixed colours
+    assert set(P.CLASSIFIER_COLOURS) == set(C.ALL_CLASSIFIERS) >= set(C.CLASSIFIERS)
+    assert len(set(P.CLASSIFIER_COLOURS.values())) == len(C.ALL_CLASSIFIERS)
+    assert len(set(P.CLASSIFIER_DASH.values())) == len(C.ALL_CLASSIFIERS)
     assert set(P.REGRESSOR_COLOURS) == set(C.REGRESSORS)
 
 

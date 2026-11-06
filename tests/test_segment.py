@@ -179,6 +179,7 @@ def test_end_to_end_contracts(seg_result):
         C.SEGMENT_PROFILES_PARQUET,
         C.K_SELECTION_PARQUET,
         C.PCA_LOADINGS_PARQUET,
+        C.SEGMENT_PRESETS_PARQUET,
     }
     for path, df in res.tables.items():
         C.validate(df, path)
@@ -221,12 +222,35 @@ def test_model_round_trips_on_raw_features(seg_result):
     joblib.dump(res.model, buf)
     buf.seek(0)
     model = joblib.load(buf)
-    assert set(model) == {"pipeline", "features", "label_to_segment", "segment_names"}
+    assert set(model) == {"pipeline", "features", "label_to_segment", "segment_names", "pca"}
     pred = CL.predict_segment(model, f)  # raw, un-logged features (extra columns ignored)
     seg = res.tables[C.SEGMENTS_PARQUET]
     np.testing.assert_array_equal(pred, seg["segment"].to_numpy())
     one = f[model["features"]].iloc[[0]]
     assert CL.predict_segment(model, one)[0] == seg["segment"].iloc[0]
+
+
+def test_model_pca_places_a_new_customer_on_the_scatter(seg_result):
+    f, _, _, res = seg_result
+    model, seg = res.model, res.tables[C.SEGMENTS_PARQUET]
+    assert model["pca"].n_components_ == 3
+    pcs = seg[["pc1", "pc2", "pc3"]].to_numpy()
+    np.testing.assert_allclose(CL.pca_coords(model, f), pcs, atol=1e-8)  # raw features in
+    one = f[model["features"]].iloc[[3]]  # a single "new" customer
+    np.testing.assert_allclose(CL.pca_coords(model, one)[0], pcs[3], atol=1e-8)
+
+
+def test_presets_are_segment_medians(seg_result):
+    f, _, _, res = seg_result
+    presets = C.validate(res.tables[C.SEGMENT_PRESETS_PARQUET], C.SEGMENT_PRESETS_PARQUET)
+    k, names = res.metrics["k"], res.metrics["segment_names"]
+    assert presets["segment"].tolist() == list(range(k))
+    assert presets["segment_name"].tolist() == [names[s] for s in range(k)]
+    seg = res.tables[C.SEGMENTS_PARQUET][["customer_id", "segment"]]
+    medians = f.merge(seg, on="customer_id").groupby("segment")[C.PRESET_FEATURES].median()
+    np.testing.assert_allclose(presets[C.PRESET_FEATURES].to_numpy(), medians.to_numpy())
+    # a preset is a valid raw input for the saved model
+    assert len(CL.predict_segment(res.model, presets)) == k
 
 
 def test_end_to_end_deterministic_and_config_k(synthetic_shop, seg_result):

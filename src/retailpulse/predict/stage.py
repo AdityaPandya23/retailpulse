@@ -3,8 +3,8 @@
 Inputs : C.SALES_PARQUET, C.RETURNS_PARQUET (train snapshot), C.FEATURES_CUTOFF_PARQUET,
          C.LABELS_PARQUET (test snapshot), config.yaml (cutoff, horizon, predict.*).
 Outputs: C.CLASSIFICATION_PARQUET, C.ROC_PARQUET, C.PR_PARQUET, C.KNN_CURVE_PARQUET,
-         C.REGRESSION_PARQUET, C.CLASSIFIER_JOBLIB, C.REGRESSOR_JOBLIB;
-         metrics.json sections "classify", "regress", "backtest".
+         C.REGRESSION_PARQUET, C.CLASSIFIER_JOBLIB (best), C.CLASSIFIERS_JOBLIB (all models),
+         C.REGRESSOR_JOBLIB; metrics.json sections "classify", "regress", "backtest".
 `compute()` is pure (frames in, tables / metrics / models out); `run()` only does I/O.
 """
 
@@ -33,6 +33,7 @@ OUTPUTS = (
     C.KNN_CURVE_PARQUET,
     C.REGRESSION_PARQUET,
     C.CLASSIFIER_JOBLIB,
+    C.CLASSIFIERS_JOBLIB,
     C.REGRESSOR_JOBLIB,
 )
 INPUTS = (C.SALES_PARQUET, C.RETURNS_PARQUET, C.FEATURES_CUTOFF_PARQUET, C.LABELS_PARQUET)
@@ -108,6 +109,12 @@ def compute(
             "features": list(FEATURES),
             "model": cls.best_model,
             "threshold": cls.threshold,
+        },
+        C.CLASSIFIERS_JOBLIB: {  # every model refit on the full train set + its train threshold
+            "pipelines": dict(cls.pipelines),
+            "thresholds": {m: float(cls.metrics["models"][m]["threshold"]) for m in cls.pipelines},
+            "features": list(FEATURES),
+            "best_model": cls.best_model,
         },
         C.REGRESSOR_JOBLIB: {
             "pipeline": reg.pipeline,

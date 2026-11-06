@@ -29,7 +29,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from retailpulse import contracts as C
-from retailpulse.config import CUTOFF, HORIZON_DAYS, SEED
+from retailpulse.config import CUTOFF, HORIZON_DAYS, RULES, SEED, SEGMENT
 from retailpulse.features import log1p_skewed
 
 N_CUSTOMERS = 40
@@ -90,7 +90,8 @@ def mock_labels(rng: np.random.Generator, f: pd.DataFrame) -> pd.DataFrame:
 
 
 def _segment_tables(rng, f: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dict]:
-    X = StandardScaler().fit_transform(log1p_skewed(f)[C.FEATURE_COLUMNS])
+    feats = list(SEGMENT.features)  # same clustering inputs as the real segment stage
+    X = StandardScaler().fit_transform(log1p_skewed(f)[feats])
     k_rows, labels_by_k = [], {}
     for k in range(2, 11):
         km = KMeans(n_clusters=k, n_init=10, random_state=SEED).fit(X)
@@ -134,7 +135,10 @@ def _segment_tables(rng, f: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dic
     profiles.insert(3, "customer_share", (sizes["n"] / sizes["n"].sum()).to_numpy())
     profiles.insert(4, "revenue_share", (sizes["rev"] / sizes["rev"].sum()).to_numpy())
     loadings = pd.DataFrame(pca.components_.T, columns=["pc1", "pc2", "pc3"])
-    loadings.insert(0, "feature", C.FEATURE_COLUMNS)
+    loadings.insert(0, "feature", feats)
+    seg_ids = seg.astype("int64")
+    presets = f[C.PRESET_FEATURES].groupby(seg_ids).median().rename_axis("segment").reset_index()
+    presets.insert(1, "segment_name", [SEGMENT_NAMES[s] for s in presets["segment"]])
 
     chosen = k_sel.loc[k_sel["k"] == K].iloc[0]
     table = pd.crosstab(seg, f["non_uk_share"] > 0.5)
@@ -174,6 +178,7 @@ def _segment_tables(rng, f: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dic
         C.SEGMENT_PROFILES_PARQUET: profiles,
         C.K_SELECTION_PARQUET: k_sel,
         C.PCA_LOADINGS_PARQUET: loadings,
+        C.SEGMENT_PRESETS_PARQUET: presets,
     }
     return tables, metrics
 
@@ -316,7 +321,8 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
     codes = mock_codes()
     names = [f"MOCK PRODUCT {i:02d}" for i in range(1, N_PRODUCTS + 1)]
     rows = []
-    for scope in ["overall", *(f"segment:{n}" for n in SEGMENT_NAMES)]:
+    seg_scopes = [f"segment:{n}" for n in SEGMENT_NAMES] if RULES.per_segment else []
+    for scope in ["overall", *seg_scopes]:  # same scopes as the real rules stage
         for _ in range(3):
             a, b = rng.choice(N_PRODUCTS, 2, replace=False)
             sa, sb = rng.uniform(0.03, 0.10, 2)
@@ -359,7 +365,8 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
         "hit_rate_at_5": 0.25,
         "popularity_hit_rate_at_5": 0.15,
         "n_eval_customers": 20,
-        "conclusion": "MOCK: association rules per segment (placeholder).",
+        "per_segment": RULES.per_segment,
+        "conclusion": "MOCK: association rules (placeholder).",
     }
     tables = {C.RULES_PARQUET: rules, C.RECOMMENDATIONS_PARQUET: pd.DataFrame(rec_rows)}
     return tables, metrics
@@ -463,8 +470,12 @@ def _app_tables(rng, f, lab, seg_tables, rule_tables) -> tuple[dict, dict]:
     # recommendations from the real recommender on the mock sales + mock rules, so "rule"
     # recommendations have a rule that fired (overrides the random ones of _rule_tables)
     segments = seg_tables[C.SEGMENTS_PARQUET]
+    before = R.product_lines(sales, end=CUTOFF)
     recs = R.recommend_all(
-        R.product_lines(sales, end=CUTOFF), rule_tables[C.RULES_PARQUET], f["customer_id"], segments
+        before,
+        rule_tables[C.RULES_PARQUET],
+        f["customer_id"],
+        segments if RULES.per_segment else None,
     )
     reasons = app_data.recommendation_reasons(sales, rule_tables[C.RULES_PARQUET], recs, segments)
     eda_tables, eda_summary = eda.run(full, sales)
@@ -475,6 +486,7 @@ def _app_tables(rng, f, lab, seg_tables, rule_tables) -> tuple[dict, dict]:
     )
     tables = {
         C.RECOMMENDATIONS_PARQUET: recs,
+        C.PRODUCTS_PARQUET: R.product_table(before),
         C.TIMELINE_PARQUET: timeline,
         C.REC_REASONS_PARQUET: reasons,
         C.CUBE_PARQUET: mock_cube(sales),
@@ -592,19 +604,24 @@ def build_mock_models(
     lab = tables[C.LABELS_PARQUET]
     seg = tables[C.SEGMENTS_PARQUET]
     # same preprocessing + KMeans settings as _segment_tables -> the same labels (= segment ids)
-    seg_pipe = segment_pipeline(C.FEATURE_COLUMNS, K, SEED).fit(f[C.FEATURE_COLUMNS])
+    feats = list(SEGMENT.features)
+    seg_pipe = segment_pipeline(feats, K, SEED).fit(f[feats])
+    pca = PCA(n_components=3, random_state=SEED).fit(seg_pipe[:-1].transform(f[feats]))
     names = dict(zip(seg["segment"].astype(int), seg["segment_name"].astype(str), strict=True))
     df = f.merge(lab, on="customer_id")
-    best = ((metrics or {}).get("classify") or {}).get("best_model", "logistic")
-    clf = make_classifier(best, k=5).fit(df[FEATURES], df["returned_flag"])
+    best = ((metrics or {}).get("classify") or {}).get("best_model", C.CLASSIFIERS[0])
+    X, y = df[FEATURES], df["returned_flag"]
+    pipes = {m: make_classifier(m, k=5).fit(X, y) for m in C.CLASSIFIERS}
+    clf = pipes[best] if best in pipes else make_classifier(best, k=5).fit(X, y)
     ret = df[df["next_spend"] > 0]
     reg = make_regressor("multiple_lr").fit(ret[FEATURES], np.log1p(ret["next_spend"]))
     return {
         C.SEGMENT_MODEL_JOBLIB: {
             "pipeline": seg_pipe,
-            "features": list(C.FEATURE_COLUMNS),
+            "features": feats,
             "label_to_segment": {k: k for k in range(K)},
             "segment_names": {k: names.get(k, SEGMENT_NAMES[k]) for k in range(K)},
+            "pca": pca,
             "mock": True,
         },
         C.CLASSIFIER_JOBLIB: {
@@ -612,6 +629,13 @@ def build_mock_models(
             "features": list(FEATURES),
             "model": best,
             "threshold": 0.5,
+            "mock": True,
+        },
+        C.CLASSIFIERS_JOBLIB: {
+            "pipelines": pipes,
+            "thresholds": dict.fromkeys(pipes, 0.5),  # = the mock classify thresholds
+            "features": list(FEATURES),
+            "best_model": best,
             "mock": True,
         },
         C.REGRESSOR_JOBLIB: {

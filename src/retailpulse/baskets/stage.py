@@ -1,8 +1,10 @@
 """Basket stage: `python -m retailpulse.baskets.stage`.
 
-Inputs : C.SALES_PARQUET, C.FEATURES_CUTOFF_PARQUET, C.SEGMENTS_PARQUET (optional: without it
-         only the "overall" scope is mined; re-run once segments exist), config.yaml (rules.*).
-Outputs: C.RULES_PARQUET, C.RECOMMENDATIONS_PARQUET; metrics.json section "rules".
+Inputs : C.SALES_PARQUET, C.FEATURES_CUTOFF_PARQUET, C.SEGMENTS_PARQUET (used only when
+         rules.per_segment is true; without it only the "overall" scope is mined),
+         config.yaml (rules.*).
+Outputs: C.RULES_PARQUET, C.RECOMMENDATIONS_PARQUET, C.PRODUCTS_PARQUET (top products =
+         the overall rule universe); metrics.json section "rules".
 `compute()` is pure (frames in, tables / metrics out); `run()` only does I/O.
 """
 
@@ -20,7 +22,7 @@ from retailpulse.config import CUTOFF, HORIZON_DAYS, RULES
 
 log = logging.getLogger("retailpulse.baskets")
 
-OUTPUTS = (C.RULES_PARQUET, C.RECOMMENDATIONS_PARQUET)
+OUTPUTS = (C.RULES_PARQUET, C.RECOMMENDATIONS_PARQUET, C.PRODUCTS_PARQUET)
 INPUTS = (C.SALES_PARQUET, C.FEATURES_CUTOFF_PARQUET, C.SEGMENTS_PARQUET)
 METRICS_SECTIONS = ("rules",)
 HIT_K = 5
@@ -39,11 +41,17 @@ def compute(
     max_len: int = RULES.max_len,
     max_rules: int = RULES.max_rules_per_scope,
     n_recommend: int = RULES.n_recommend,
+    per_segment: bool = RULES.per_segment,
 ) -> tuple[dict[Path, pd.DataFrame], dict]:
-    """-> ({RULES_PARQUET: rules, RECOMMENDATIONS_PARQUET: recs}, metrics["rules"])."""
+    """-> ({RULES_PARQUET, RECOMMENDATIONS_PARQUET, PRODUCTS_PARQUET}, metrics["rules"]).
+
+    per_segment False: `segments` is ignored (overall rules + overall best sellers only).
+    """
     cutoff = pd.Timestamp(cutoff)
     before = R.product_lines(sales, end=cutoff)
     window = R.product_lines(sales, start=cutoff, end=cutoff + pd.Timedelta(days=horizon_days))
+    if not per_segment:
+        segments = None
     if segments is not None:
         segments = segments[segments["customer_id"].isin(before["customer_id"].unique())]
     desc = R.descriptions(before)
@@ -74,7 +82,17 @@ def compute(
         str((cutoff + pd.Timedelta(days=horizon_days)).date()),
     ]
 
-    tables = {C.RULES_PARQUET: rules, C.RECOMMENDATIONS_PARQUET: recs}
+    metrics["per_segment"] = bool(per_segment)
+    if not metrics["segments_used"]:
+        metrics["recommendation_note"] = (
+            "score = sum of confidence x lift of the fired overall rules; 'popular' fill items "
+            "score their invoice support (overall best sellers)"
+        )
+    tables = {
+        C.RULES_PARQUET: rules,
+        C.RECOMMENDATIONS_PARQUET: recs,
+        C.PRODUCTS_PARQUET: R.product_table(before, top_n_products, desc),
+    }
     for path, df in tables.items():
         C.validate(df, path)
     missing = [k for k in C.P3_METRICS_KEYS["rules"] if k not in metrics]
@@ -91,7 +109,9 @@ def run() -> dict:
     )
     customers = pd.read_parquet(C.FEATURES_CUTOFF_PARQUET, columns=["customer_id"])
     segments = None
-    if C.SEGMENTS_PARQUET.exists():
+    if not RULES.per_segment:
+        log.info("rules.per_segment is false: overall rules and best sellers only")
+    elif C.SEGMENTS_PARQUET.exists():
         segments = pd.read_parquet(
             C.SEGMENTS_PARQUET, columns=["customer_id", "segment", "segment_name"]
         )
