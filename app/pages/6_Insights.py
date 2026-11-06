@@ -11,7 +11,7 @@ from retailpulse import insights as I
 from retailpulse.viz import predictions as VP
 
 layout.setup_page("Insights")
-horizon = data.metrics("features").get("horizon_days", 90)
+horizon = data.horizon_days()
 layout.page_header(
     "Insights",
     "So what should the business do?",

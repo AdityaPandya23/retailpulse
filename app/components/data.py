@@ -20,6 +20,7 @@ import pandas as pd
 import streamlit as st
 
 from retailpulse import contracts as C
+from retailpulse.config import HORIZON_DAYS
 from retailpulse.viz import common as VC
 
 ENV_VAR = "RETAILPULSE_ARTIFACTS"
@@ -150,6 +151,11 @@ def limitations() -> list[str]:
 
     file = Path(C.README_MD)
     return parse(_read_text(str(file), _mtime(file))) if file.exists() else []
+
+
+def horizon_days() -> int:
+    """Label horizon in days: metrics.json features.horizon_days, else config.yaml."""
+    return int(metrics("features").get("horizon_days") or HORIZON_DAYS)
 
 
 # ------------------------------------------------------------------ segment helpers

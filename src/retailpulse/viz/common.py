@@ -102,6 +102,14 @@ def empty_figure(message: str, title: str = "") -> go.Figure:
     return style(fig, title, height=300)
 
 
+def md_escape(text) -> str:
+    """Escape markdown / LaTeX characters (product names) before st.markdown."""
+    out = str(text)
+    for ch in ("\\", "*", "_", "$", "`", "[", "]", "#", "~", "|", "<", ">"):
+        out = out.replace(ch, "\\" + ch)
+    return out
+
+
 def money(x: float, decimals: int = 0) -> str:
     """£1,234 / £1.2M style for labels and hover text."""
     if x is None or not np.isfinite(x):

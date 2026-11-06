@@ -15,6 +15,9 @@ import pandas as pd
 from retailpulse import contracts as C
 from retailpulse.config import HORIZON_DAYS, PREDICT, SEGMENT
 from retailpulse.segment import cluster
+from retailpulse.viz.common import md_escape
+
+__all__ = ["md_escape"]  # re-exported for the Home page
 
 # the 6 model inputs in config order (segment.features, then any extra predict.features)
 DEMO_FEATURES: list[str] = list(dict.fromkeys([*SEGMENT.features, *PREDICT.features]))
@@ -202,7 +205,7 @@ def verdict(probs: pd.DataFrame, horizon_days: int = HORIZON_DAYS) -> dict:
         return {"model": None, "will_return": None, "text": "No classifier available."}
     chosen = probs[probs["chosen"]]
     row = (chosen if len(chosen) else probs).iloc[0]
-    thr = row["threshold"] if row["threshold"] is not None else 0.5
+    thr = 0.5 if pd.isna(row["threshold"]) else float(row["threshold"])
     yes = bool(row["p_return"] >= thr)
     votes = probs.assign(t=probs["threshold"].fillna(0.5))
     agree = int(((votes["p_return"] >= votes["t"]) == yes).sum())
@@ -224,6 +227,14 @@ def verdict(probs: pd.DataFrame, horizon_days: int = HORIZON_DAYS) -> dict:
 
 
 # ------------------------------------------------------------------ what to offer
+def product_options(products: pd.DataFrame | None) -> tuple[list[str], dict[str, str]]:
+    """(stock codes best sellers first, {code: description}) for the basket multiselect."""
+    if products is None or products.empty:
+        return [], {}
+    codes = products["stock_code"].astype(str).tolist()
+    return codes, dict(zip(codes, products["description"].astype(str), strict=True))
+
+
 def default_basket(rules_metrics: Mapping | None, product_codes: Sequence[str]) -> list[str]:
     """Antecedents of the top overall rule (metrics.json), so the demo starts with a rule hit."""
     top = (rules_metrics or {}).get("top_rule") or {}
@@ -254,14 +265,6 @@ def recommendation_lines(recs: pd.DataFrame | None) -> list[dict]:
                 "reason": reason,
             }
         )
-    return out
-
-
-def md_escape(text: str) -> str:
-    """Escape markdown / LaTeX characters in product names before st.markdown."""
-    out = str(text)
-    for ch in ("\\", "*", "_", "$", "`", "[", "]", "#", "~", "|", "<", ">"):
-        out = out.replace(ch, "\\" + ch)
     return out
 
 

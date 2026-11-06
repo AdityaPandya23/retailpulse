@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from retailpulse.viz import common as VC
+from retailpulse.viz.predictions import test_predictions
 
 WIN_BACK = "Win-back offer"
 REWARD = "Reward and keep"
@@ -72,19 +73,11 @@ def _with_segment(frame: pd.DataFrame | None, segments: pd.DataFrame | None) -> 
     return frame.merge(segments[["customer_id", "segment"]], on="customer_id", how="inner")
 
 
-def future_rows(classification: pd.DataFrame | None, model: str | None) -> pd.DataFrame:
-    """Test-split rows (the real cutoff window) of one model."""
-    if classification is None or classification.empty or model is None:
-        return pd.DataFrame()
-    c = classification
-    return c[(c["split"] == "test") & (c["model"] == model)]
-
-
 def mean_p_return(
     classification: pd.DataFrame | None, segments: pd.DataFrame | None, model: str | None
 ) -> dict[int, float]:
     """{segment: mean predicted P(return)} of one model on the test split."""
-    j = _with_segment(future_rows(classification, model), segments)
+    j = _with_segment(test_predictions(classification, model), segments)
     if j.empty:
         return {}
     return {int(s): float(v) for s, v in j.groupby("segment")["p_return"].mean().items()}
@@ -103,7 +96,7 @@ def came_back_share(
             int(s): float(v)
             for s, v in zip(profiles["segment"], profiles["bought_again_share"], strict=True)
         }
-    j = _with_segment(future_rows(classification, model), segments)
+    j = _with_segment(test_predictions(classification, model), segments)
     if j.empty:
         return {}
     return {int(s): float(v) for s, v in j.groupby("segment")["returned_flag"].mean().items()}

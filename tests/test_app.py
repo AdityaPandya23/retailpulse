@@ -136,6 +136,42 @@ def test_guided_tour_toggle_shows_callouts(run_app_page):
     assert any("Tour 1" in i.value for i in at.info)
 
 
+def test_segmentation_pc_lines_show_variance_share(run_app_page):
+    at = run_app_page("Home.py")
+    at.switch_page("pages/3_Segmentation.py").run()
+    assert any("**PC1** (" in m.value and "of variance" in m.value for m in at.markdown)
+
+
+def test_prediction_without_test_rows_for_best_model(mock_artifacts, tmp_path, monkeypatch):
+    """Review fix: metrics name a best model with no test predictions -> info, no KeyError."""
+    from streamlit.testing.v1 import AppTest
+
+    (tmp_path / "metrics.json").write_text(
+        json.dumps({"classify": {"best_model": "lda"}}), encoding="utf-8"
+    )
+    monkeypatch.setenv("RETAILPULSE_ARTIFACTS", str(tmp_path))  # every other file: mock
+    at = AppTest.from_file(str(APP_DIR / "Home.py"), default_timeout=120)
+    at.run()
+    at.switch_page("pages/4_Prediction.py").run()
+    assert not at.exception, at.exception
+    assert any("No test-window predictions" in i.value for i in at.info)
+    assert not any(b.key == "pred_reveal" for b in at.button)
+
+
+def test_horizon_days_falls_back_to_config(mock_artifacts, tmp_path, monkeypatch):
+    from components import data
+
+    from retailpulse.config import HORIZON_DAYS
+
+    (tmp_path / "metrics.json").write_text(json.dumps({"features": {}}), encoding="utf-8")
+    monkeypatch.setenv(data.ENV_VAR, str(tmp_path))
+    assert data.horizon_days() == HORIZON_DAYS
+    (tmp_path / "metrics.json").write_text(
+        json.dumps({"features": {"horizon_days": 30}}), encoding="utf-8"
+    )
+    assert data.horizon_days() == 30
+
+
 # ---------------- data.py: per-file / per-section fallback to mock ----------------
 def test_data_falls_back_per_file_and_section(mock_artifacts, tmp_path, monkeypatch):
     from components import data

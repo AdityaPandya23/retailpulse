@@ -58,3 +58,11 @@ def test_style_sets_the_template_on_the_figure():
 def test_num_formats_none_and_nan_as_na():
     assert VC.num(None) == "n/a" and VC.num(float("nan"), ".1f") == "n/a"
     assert VC.num(1234.567, ",.1f") == "1,234.6" and VC.num(2e-6, ".2g") == "2e-06"
+
+
+def test_md_escape_is_shared_with_demo():
+    from retailpulse import demo
+    from retailpulse.viz.common import md_escape
+
+    assert demo.md_escape is md_escape
+    assert md_escape("A_B *C* $1 [x]") == r"A\_B \*C\* \$1 \[x\]"

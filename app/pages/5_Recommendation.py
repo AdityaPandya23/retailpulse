@@ -21,35 +21,27 @@ layout.page_header(
 rm = data.metrics("rules")
 rules = data.table(C.RULES_PARQUET)
 products = data.table(C.PRODUCTS_PARQUET)
-n_inv = rm.get("n_invoices")
-n_inv = n_inv.get("overall") if isinstance(n_inv, dict) else n_inv
 top = rm.get("top_rule") or {}
 n_rec = int(rm.get("n_recommend") or RULES.n_recommend)
 
-PERCENT = st.column_config.NumberColumn(format="percent")
 RULE_COLUMNS = {
-    "Support": st.column_config.NumberColumn(format="%.2f%%"),
-    "Confidence": PERCENT,
+    "Support (%)": st.column_config.NumberColumn(format="%.2f"),
+    "Confidence (%)": st.column_config.NumberColumn(format="%.0f"),
     "Lift": st.column_config.NumberColumn(format="%.1f"),
 }
 
 
-def _rule_frame(df):
-    """Support shown as a percentage with 2 decimals (support values are small)."""
-    return df.assign(Support=100 * df["Support"])
-
-
 # ------------------------------------------------------------------ the three measures
 st.subheader("1 · Three numbers behind every rule")
-if top:
-    st.markdown(f"The strongest rule: **{top.get('antecedents')} → {top.get('consequents')}**")
+if VR.rule_title(top):
+    st.markdown(f"The strongest rule: {VR.rule_title(top)}")
 tour.callout(
     1,
     "Read the three boxes left to right: how common the pair is, how often the rule is right, "
     "and how much stronger than chance it is.",
     "Support, confidence, lift",
 )
-explained = VR.rule_explainer(top, n_inv)
+explained = VR.rule_explainer(top, VR.overall_invoices(rm))
 if explained:
     for col, key in zip(st.columns(3), ("support", "confidence", "lift"), strict=True):
         with col, st.container(border=True):
@@ -62,7 +54,7 @@ st.subheader("2 · The strongest rules")
 col_table, col_bubble = st.columns([1, 1])
 with col_table:
     st.dataframe(
-        _rule_frame(VR.top_rules_table(rules, 10)),
+        VR.top_rules_table(rules, 10),
         hide_index=True,
         width="stretch",
         column_config=RULE_COLUMNS,
@@ -88,16 +80,15 @@ if starts.empty:
 else:
     codes = starts["stock_code"].tolist()
     label = dict(zip(codes, starts["description"], strict=True))
-    first = (top.get("antecedent_codes") or "").split(",")[0]
     code = st.selectbox(
         f"Products that start a rule ({len(codes)})",
         codes,
-        index=codes.index(first) if first in codes else 0,
+        index=codes.index(VR.default_product(top, codes)),
         format_func=lambda c: f"{label.get(c, c)} ({c})",
         key="rec_product",
     )
     st.dataframe(
-        _rule_frame(VR.rules_for_product(rules, code)),
+        VR.rules_for_product(rules, code),
         hide_index=True,
         width="stretch",
         column_config=RULE_COLUMNS,

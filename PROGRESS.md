@@ -176,6 +176,16 @@
 - Action rule per segment in order, first match wins; ties go to the lowest segment id (v2 has no "Reward" tie).
 - Next: human items below (push tag, deploy, rehearse DEMO_SCRIPT.md v2).
 
+## P6b review fixes (2026-11-07)
+- /code-review high of d2fd9b3: fixed all 9. verdict: a missing threshold (NaN in a float column) now falls back
+  to 0.5; Time Machine guarded when the chosen model has no test rows (summary computed once); product names
+  markdown-escaped in rule texts (md_escape moved to viz/common); PC lines show their variance share; horizon
+  fallback = config via data.horizon_days(); overall_rules never falls back to segment rules (= recommender);
+  page logic moved to src (rule tables in %, overall_invoices, rule_title, default_product, knn_best_k,
+  product_options); insights reuses predictions.test_predictions.
+- Tests: 286 pass (+11 regression tests). Ruff clean. Fresh headless server: 6/6 pages, 0 exceptions, no Mock
+  badge (an older test server had kept port 8599; it is stopped and the check was rerun on a new one).
+
 ## Open items (human)
 1. Push the tag so README's v1 link works: `git push origin v1-full`.
 2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.

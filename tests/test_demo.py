@@ -146,3 +146,26 @@ def test_default_basket_and_recommendation_lines():
 def test_md_escape():
     assert demo.md_escape("SET OF 3 *CAKE* TINS $5") == "SET OF 3 \\*CAKE\\* TINS \\$5"
     assert demo.md_escape("PLAIN") == "PLAIN"
+
+
+def test_verdict_missing_threshold_falls_back_to_half():
+    # review fix: a None threshold in a float column is NaN, not None
+    probs = pd.DataFrame(
+        {
+            "model": ["logistic", "knn"],
+            "p_return": [0.3, 0.6],
+            "threshold": [0.35, None],
+            "chosen": [False, True],
+        }
+    )
+    assert probs["threshold"].isna().iloc[1]
+    v = demo.verdict(probs, 90)
+    assert v["threshold"] == 0.5 and v["will_return"] is True
+    assert "nan" not in v["text"] and "50% threshold" in v["text"]
+
+
+def test_product_options():
+    products = pd.DataFrame({"stock_code": [85123, "22423"], "description": ["HEART", "CAKE"]})
+    codes, desc = demo.product_options(products)
+    assert codes == ["85123", "22423"] and desc == {"85123": "HEART", "22423": "CAKE"}
+    assert demo.product_options(None) == ([], {})

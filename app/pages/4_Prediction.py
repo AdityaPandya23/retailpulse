@@ -14,7 +14,7 @@ from retailpulse.viz.common import pct
 REVEAL_KEY = "pred_revealed"
 
 layout.setup_page("Prediction")
-horizon = data.metrics("features").get("horizon_days", 90)
+horizon = data.horizon_days()
 layout.page_header(
     "Prediction",
     f"B · Will they buy again in the next {horizon} days?",
@@ -31,6 +31,7 @@ if classification is None or classification.empty:
 best = VP.best_model(cls, classification)
 best_test = VP.test_predictions(classification, best)
 threshold = VP.model_threshold(cls, best, bt)
+summary = VP.time_machine_summary(best_test)  # once per rerun: section 2 and section 3
 cutoff = cls.get("test_cutoff") or data.metrics("features").get("cutoff") or "the cutoff"
 train_cutoff = cls.get("train_cutoff") or "an earlier snapshot"
 
@@ -95,7 +96,7 @@ col_cm, col_cm_text = st.columns([3, 2])
 with col_cm:
     layout.chart(VP.confusion_figure(best_test, best, threshold), key="pred_confusion")
 with col_cm_text:
-    cm = VP.time_machine_summary(best_test)
+    cm = summary
     if cm.get("n_customers"):
         st.markdown(
             f"**{best}** (the chosen model) flags {cm['n_predicted']:,} of "
@@ -113,59 +114,61 @@ def _reveal(flag: bool) -> None:
     st.session_state[REVEAL_KEY] = flag
 
 
-s = VP.time_machine_summary(best_test)
-st.markdown(
-    f"On **{cutoff}** the chosen model scored all {s['n_customers']:,} customers and wrote "
-    f"down **{s['n_predicted']:,}** it expected to buy again within {horizon} days "
-    f"(probability ≥ {threshold:.2f})."
-    if threshold is not None
-    else f"The chosen model scored all {s['n_customers']:,} customers at {cutoff}."
-)
-if not st.session_state.get(REVEAL_KEY, False):
-    st.button(
-        "Reveal what actually happened",
-        key="pred_reveal",
-        type="primary",
-        icon=":material/visibility:",
-        on_click=_reveal,
-        args=(True,),
-    )
+s = summary
+if not s.get("n_customers"):  # no test rows for the chosen model: nothing to reveal
+    st.info(f"No test-window predictions for the chosen model ({best}).")
 else:
-    st.button("Hide the outcome again", key="pred_hide", on_click=_reveal, args=(False,))
-    tour.callout(
-        3,
-        "Customers ranked by predicted probability into ten groups: the top group really came "
-        "back far more often than average, the bottom group rarely.",
-        "The reveal",
+    st.markdown(
+        f"On **{cutoff}** the chosen model scored all {s['n_customers']:,} customers and "
+        f"wrote down **{s['n_predicted']:,}** it expected to buy again within {horizon} days"
+        + (f" (probability ≥ {threshold:.2f})." if threshold is not None else ".")
     )
-    layout.kpi_row(
-        [
-            {"label": "We predicted", "value": f"{s['n_predicted']:,} customers"},
-            {
-                "label": "… of whom bought again",
-                "value": pct(s["share_actually_returned"]),
-                "help": f"{s['n_predicted_and_returned']:,} of {s['n_predicted']:,}.",
-            },
-            {
-                "label": "Base rate (all customers)",
-                "value": pct(s["base_rate"]),
-                "help": f"{s['n_actually_returned']:,} of {s['n_customers']:,} came back.",
-            },
-            {
-                "label": "Lift",
-                "value": f"{s['lift']:.2f}×" if s["lift"] == s["lift"] else "n/a",
-                "help": "How much better than picking customers at random.",
-            },
-        ]
-    )
-    layout.chart(VP.decile_figure(VP.deciles(best_test), s["base_rate"], best), key="pred_deciles")
-    layout.conclusion(bt.get("conclusion"), "Backtest")
+    if not st.session_state.get(REVEAL_KEY, False):
+        st.button(
+            "Reveal what actually happened",
+            key="pred_reveal",
+            type="primary",
+            icon=":material/visibility:",
+            on_click=_reveal,
+            args=(True,),
+        )
+    else:
+        st.button("Hide the outcome again", key="pred_hide", on_click=_reveal, args=(False,))
+        tour.callout(
+            3,
+            "Customers ranked by predicted probability into ten groups: the top group really came "
+            "back far more often than average, the bottom group rarely.",
+            "The reveal",
+        )
+        layout.kpi_row(
+            [
+                {"label": "We predicted", "value": f"{s['n_predicted']:,} customers"},
+                {
+                    "label": "… of whom bought again",
+                    "value": pct(s["share_actually_returned"]),
+                    "help": f"{s['n_predicted_and_returned']:,} of {s['n_predicted']:,}.",
+                },
+                {
+                    "label": "Base rate (all customers)",
+                    "value": pct(s["base_rate"]),
+                    "help": f"{s['n_actually_returned']:,} of {s['n_customers']:,} came back.",
+                },
+                {
+                    "label": "Lift",
+                    "value": f"{s['lift']:.2f}×" if s["lift"] == s["lift"] else "n/a",
+                    "help": "How much better than picking customers at random.",
+                },
+            ]
+        )
+        layout.chart(
+            VP.decile_figure(VP.deciles(best_test), s["base_rate"], best), key="pred_deciles"
+        )
+        layout.conclusion(bt.get("conclusion"), "Backtest")
 
 # ------------------------------------------------------------------ KNN
 st.subheader("4 · KNN: how many neighbours?")
 curve = data.table(C.KNN_CURVE_PARQUET)
-best_k = cls.get("knn_k") or ((cls.get("models") or {}).get("knn") or {}).get("k")
-best_k = int(best_k) if best_k is not None else None
+best_k = VP.knn_best_k(cls)
 options = VP.knn_k_options(curve, best_k)
 if not options:
     st.info("No KNN curve available.")

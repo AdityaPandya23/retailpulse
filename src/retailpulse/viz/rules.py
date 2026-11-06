@@ -18,18 +18,30 @@ from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
 
 OVERALL = "overall"
-RULE_TABLE_COLUMNS = ["If a basket has", "it often also has", "Support", "Confidence", "Lift"]
+# display table: support and confidence already in percent (0-100) so the page only formats
+RULE_TABLE_COLUMNS = [
+    "If a basket has",
+    "it often also has",
+    "Support (%)",
+    "Confidence (%)",
+    "Lift",
+]
 RULES_COLOUR = P.BLUE
 BEST_SELLER_COLOUR = P.GREY
 
 
 def overall_rules(rules: pd.DataFrame | None) -> pd.DataFrame:
-    """The overall-scope rules (all rules when there is no scope column), strongest lift first."""
+    """The overall-scope rules, strongest lift first; all rules only when there is no scope
+    column. Same rule set as rules.recommend_from_basket (overall only), so the Home offers and
+    this page never disagree."""
+    empty = pd.DataFrame(columns=["antecedents", "consequents", "support", "confidence", "lift"])
     if rules is None or rules.empty:
-        return pd.DataFrame(columns=["antecedents", "consequents", "support", "confidence", "lift"])
+        return empty
     r = rules
-    if "scope" in r.columns and (r["scope"] == OVERALL).any():
+    if "scope" in r.columns:
         r = r[r["scope"] == OVERALL]
+        if r.empty:
+            return empty
     return r.sort_values(["lift", "confidence"], ascending=False).reset_index(drop=True)
 
 
@@ -38,8 +50,8 @@ def _table(r: pd.DataFrame) -> pd.DataFrame:
         {
             "If a basket has": r["antecedents"].astype(str).to_numpy(),
             "it often also has": r["consequents"].astype(str).to_numpy(),
-            "Support": r["support"].astype(float).to_numpy(),
-            "Confidence": r["confidence"].astype(float).to_numpy(),
+            "Support (%)": 100 * r["support"].astype(float).to_numpy(),
+            "Confidence (%)": 100 * r["confidence"].astype(float).to_numpy(),
             "Lift": r["lift"].astype(float).to_numpy(),
         },
         columns=RULE_TABLE_COLUMNS,
@@ -47,8 +59,30 @@ def _table(r: pd.DataFrame) -> pd.DataFrame:
 
 
 def top_rules_table(rules: pd.DataFrame | None, n: int = 10) -> pd.DataFrame:
-    """The n strongest overall rules (by lift) as a display table (shares as 0-1 floats)."""
+    """The n strongest overall rules (by lift) as a display table (support, confidence in %)."""
     return _table(overall_rules(rules).head(n))
+
+
+def overall_invoices(rules_metrics: Mapping | None) -> int | None:
+    """Number of invoices behind the overall rules (metrics.json rules.n_invoices)."""
+    n = (rules_metrics or {}).get("n_invoices")
+    n = n.get(OVERALL) if isinstance(n, Mapping) else n
+    return int(n) if n else None
+
+
+def rule_title(top_rule: Mapping | None) -> str | None:
+    """'**A → B**' (markdown-escaped) for one rule, or None."""
+    t = top_rule or {}
+    if not t.get("antecedents") or not t.get("consequents"):
+        return None
+    return f"**{VC.md_escape(t['antecedents'])} → {VC.md_escape(t['consequents'])}**"
+
+
+def default_product(top_rule: Mapping | None, codes) -> str | None:
+    """First antecedent code of the top rule if it is a picker option, else the first option."""
+    codes = list(codes)
+    first = str((top_rule or {}).get("antecedent_codes") or "").split(",")[0]
+    return first if first in codes else (codes[0] if codes else None)
 
 
 def rule_explainer(top_rule: Mapping | None, n_invoices: int | None = None) -> dict[str, str]:
@@ -62,7 +96,8 @@ def rule_explainer(top_rule: Mapping | None, n_invoices: int | None = None) -> d
         s, c, lift = float(t["support"]), float(t["confidence"]), float(t["lift"])
     except (KeyError, TypeError, ValueError):
         return {}
-    a, b = str(t.get("antecedents", "A")), str(t.get("consequents", "B"))
+    a = VC.md_escape(t.get("antecedents", "A"))  # product names can hold *, _ or $
+    b = VC.md_escape(t.get("consequents", "B"))
     p_b = c / lift if lift else float("nan")
     count = (
         f" (about {round(s * n_invoices):,} of {int(n_invoices):,} invoices)" if n_invoices else ""

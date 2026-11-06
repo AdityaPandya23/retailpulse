@@ -652,6 +652,13 @@ def split_timeline(
     return fig
 
 
+def knn_best_k(cls_metrics: Mapping | None) -> int | None:
+    """The KNN k chosen on train CV: classify.knn_k, else models.knn.k, else None."""
+    m = cls_metrics or {}
+    k = m.get("knn_k") or ((m.get("models") or {}).get("knn") or {}).get("k")
+    return int(k) if k is not None else None
+
+
 def knn_k_options(
     curve: pd.DataFrame | None, best_k: int | None, wanted=KNN_K_CHOICES
 ) -> list[int]:

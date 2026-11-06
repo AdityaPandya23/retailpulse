@@ -343,3 +343,49 @@ def test_raw_columns_table():
     assert len(t) == 8 and list(t["Column (here)"]) == C.RAW_COLUMNS
     assert t.loc[0, "Column (Excel)"] == "Invoice" and "Customer ID" in set(t["Column (Excel)"])
     assert t["Meaning"].str.len().gt(5).all()
+
+
+# ------------------------------------------------------------------ review fixes
+def test_overall_rules_never_fall_back_to_segment_rules(rules):
+    only_segments = rules[rules["scope"] != "overall"]
+    assert VR.overall_rules(only_segments).empty  # same rule set as recommend_from_basket
+    assert VR.top_rules_table(only_segments).empty
+    assert VR.antecedent_products(only_segments).empty
+    no_scope = rules.drop(columns="scope")  # no scope column: every rule counts
+    assert len(VR.overall_rules(no_scope)) == 4
+
+
+def test_rule_tables_are_in_percent(rules):
+    t = VR.top_rules_table(rules, 1)
+    assert t.loc[0, "Support (%)"] == pytest.approx(2.0)
+    assert t.loc[0, "Confidence (%)"] == pytest.approx(70.0)
+    assert VR.rules_for_product(rules, "3").loc[0, "Support (%)"] == pytest.approx(1.5)
+
+
+def test_rule_text_escapes_product_names():
+    top = {
+        "antecedents": "*BOOMBOX IPOD",
+        "consequents": "$5 TIN_BOX",
+        "support": 0.02,
+        "confidence": 0.5,
+        "lift": 10.0,
+    }
+    e = VR.rule_explainer(top)
+    assert r"\*BOOMBOX IPOD" in e["support"] and r"\$5 TIN\_BOX" in e["lift"]
+    assert VR.rule_title(top) == r"**\*BOOMBOX IPOD → \$5 TIN\_BOX**"
+    assert VR.rule_title({}) is None
+
+
+def test_overall_invoices_and_default_product():
+    assert VR.overall_invoices({"n_invoices": {"overall": 29962, "segment:X": 10}}) == 29962
+    assert VR.overall_invoices({"n_invoices": 500}) == 500
+    assert VR.overall_invoices({}) is None and VR.overall_invoices(None) is None
+    assert VR.default_product({"antecedent_codes": "3,1"}, ["1", "3"]) == "3"
+    assert VR.default_product({"antecedent_codes": "9"}, ["1", "3"]) == "1"
+    assert VR.default_product(None, []) is None
+
+
+def test_knn_best_k():
+    assert VP.knn_best_k({"knn_k": 75}) == 75
+    assert VP.knn_best_k({"models": {"knn": {"k": 20.0}}}) == 20
+    assert VP.knn_best_k({}) is None and VP.knn_best_k(None) is None

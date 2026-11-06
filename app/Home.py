@@ -80,7 +80,7 @@ with st.expander("How it works: the pipeline", icon=":material/account_tree:"):
 names = data.segment_names()
 presets = data.table(C.SEGMENT_PRESETS_PARQUET)
 products = data.table(C.PRODUCTS_PARQUET)
-horizon = data.metrics("features").get("horizon_days", 90)
+horizon = data.horizon_days()
 
 
 def _fill(segment_id: int) -> None:
@@ -138,10 +138,7 @@ st.caption(
 for note in demo.input_warnings(values):
     st.warning(note, icon=":material/warning:")
 
-codes = [] if products is None else products["stock_code"].astype(str).tolist()
-desc = (
-    {} if products is None else dict(zip(codes, products["description"].astype(str), strict=True))
-)
+codes, desc = demo.product_options(products)
 if BASKET_KEY not in st.session_state:
     st.session_state[BASKET_KEY] = demo.default_basket(data.metrics("rules"), codes)
 if BASKET_WIDGET not in st.session_state:

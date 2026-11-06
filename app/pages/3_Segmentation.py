@@ -81,7 +81,9 @@ with col_scree:
     layout.chart(S.scree_plot(explained), key="seg_scree")
     st.markdown("**What each axis means**")
     st.markdown(
-        "\n".join(f"- {line}" for line in S.pc_meanings(data.table(C.PCA_LOADINGS_PARQUET)))
+        "\n".join(
+            f"- {line}" for line in S.pc_meanings(data.table(C.PCA_LOADINGS_PARQUET), explained)
+        )
         or "Loadings not available."
     )
 st.caption("PCA is only used to draw and check the segments; K-Means works on all features.")
