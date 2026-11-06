@@ -134,9 +134,23 @@
 - Presets = per-feature medians (typical, not a real customer). Basket "popular" rows: score NaN, no reason. A basket has
   no segment → only "overall" rules. Rules stage keeps segments.parquet as input so per_segment: true still works.
 - Mock segmentation uses segment.features (mock presets fit the mock models); mock rules are overall-only.
-- Old app still passes its AppTests (3 models now); README / DEMO_SCRIPT numbers are stale until P6b.
-- Next: P6b simplified app on these artifacts (presets, PCA placement, basket picker), then README / DEMO_SCRIPT.
+- Old app still passes its AppTests (3 models now).
+
+## P6a review + docs for P6b (2026-11-07)
+- /code-review high (9702d59, pushed): fixed 6 of 9 — best-vs-other comparison works without logistic, predict.models
+  needs ≥ 2 models; app text counts models; summarize() writes the overall-only note; mock thresholds from mock
+  metrics; sample_rows samples before copying; recommend_from_basket arg renamed best_sellers. Skipped 3: second
+  PCA(3) fit (ms, tested equal), classifier.joblib duplicating classifiers.joblib (v1 Customer 360 still loads it),
+  CLAUDE.md k/names rule (fixed below on the user's request).
+- Docs moved to v2 (user request): CLAUDE.md (k/names automatic, app v2), PLAN.md rewritten for v2 (6-page app,
+  phases, not-shown list), README.md (v2 numbers, page list, 4 limitations without expected spend), DEMO_SCRIPT.md
+  marked "outdated (v1)" until P6b rewrites it. predict.knn_k_max stays 100 (KNN slider: 1, 5, 20, best k, 100).
+- Checked (Streamlit 1.66.1): st.page_link works in AppTest only with Home.py as entrypoint → smoke tests open Home,
+  then at.switch_page("pages/<file>.py"); running a page file directly cannot link back to "Home.py".
+- Next: P6b = 6-page hub-and-spokes app (PLAN.md "App v2"), smoke tests, README page list, DEMO_SCRIPT rewrite.
 
 ## Open items (human)
-1. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
-2. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once.
+1. Push the tag so README's v1 link works: `git push origin v1-full`.
+2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
+3. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once (after P6b rewrites it).
+4. Optional after P6b: drop classifier.joblib (classifiers.joblib has the best model too) — contracts, stage, tests.

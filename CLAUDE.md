@@ -1,7 +1,7 @@
 # RetailPulse
 
 Customer segmentation, return prediction and basket analysis on UCI Online Retail II.
-Academic DSF project (NIT Warangal). Full design: @PLAN.md. Progress log: PROGRESS.md.
+Academic DSF project (NIT Warangal). Design (v2, simplified): @PLAN.md. Progress log: PROGRESS.md.
 
 ## Hard rules
 - NEVER read or print files in data/** or artifacts/**/*.parquet. Inspect data only through code
@@ -13,7 +13,9 @@ Academic DSF project (NIT Warangal). Full design: @PLAN.md. Progress log: PROGRE
 - Zero cost: only free/open-source libraries. No paid APIs or services.
 - Plots: Plotly; functions return figures. Colour-blind-safe palette, fixed colour per segment.
 - Tests use the synthetic fixture in tests/conftest.py, never the real dataset.
-- Leave the choice of k and segment names to the human (mark TODO(human) with evidence).
+- k and segment names are chosen automatically by the metric rule in segment/cluster.py (user decision,
+  P6a); never add TODO(human) for them. config.yaml segment.k / segment.names can still override.
+- App v2 = 6-page "hub and spokes" demo (PLAN.md); the old 4-page app lives only in git tag v1-full.
 
 ## Commands (Windows, run from repo root)
 - Activate env: .venv\Scripts\activate

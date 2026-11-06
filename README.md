@@ -6,20 +6,35 @@ project (NIT Warangal), built only with free, open-source tools.
 
 **Live demo:** _deploy link goes here_ (Streamlit Community Cloud)
 
+This is **v2**, a simplified, easy-to-explain demo. The full analysis app (OLAP cube, hypothesis
+tests, five classifiers, spend regression, per-segment rules, Customer 360) is kept at the git tag
+[`v1-full`](../../tree/v1-full).
+
 ## What it answers
 
 The cleaned data has 779,425 sales lines from 5,878 registered customers, £17.4M revenue.
-Customers are modelled at a cutoff of 2011-09-09, and the outcome is whether they buy again
-in the next 90 days.
+Customers are described at a cutoff of 2011-09-09, and the outcome is whether they buy again
+in the next 90 days. Every model uses the same 6 features: recency, frequency, monetary,
+tenure, average basket value and number of distinct products.
 
 | Question | Method | Headline result |
 |---|---|---|
-| **A. Who are our customers?** | Extended RFM features, K-Means vs an RFM-quartile baseline, PCA, stability, hypothesis tests | 3 segments (silhouette 0.28 vs 0.17 for RFM quartiles, stability ARI 0.98). The most valuable segment is 40% of customers and 88% of revenue. Revenue is concentrated: Gini 0.74, top 20% of customers = 77% of revenue. |
-| **B. Who will come back?** | Logistic, LDA, QDA, Naive Bayes, KNN on an out-of-time split; spend regression; backtest | Test ROC-AUC 0.78–0.80 for all five models, which are practically tied (paired t p = 0.46). Backtest: of the 1,876 customers predicted to return, 73% did, vs a 43% base rate (lift 1.68). |
-| **C. What do they buy together?** | Association rules (support, confidence, lift) overall and per segment → top-5 recommendations | 200 overall + 464 segment rules. Recommendations caught a newly bought product for 25.3% of customers, vs 16.1% for plain best sellers. |
+| **A. Who are our customers?** | K-Means on the 6 features; k and segment names chosen by an automatic rule (silhouette, segment size, stability) | 3 segments: Champions (40% of customers, 88% of revenue), Regulars (31%, 7.5%), Lost / Hibernating (29%, 4.5%). Revenue is concentrated: Gini 0.74, top 20% of customers = 77% of revenue. |
+| **B. Will they come back?** | Logistic regression, KNN and Naive Bayes on an out-of-time split, backtested | Test ROC-AUC 0.79–0.80; the models are practically tied (KNN vs logistic, paired t p = 0.30). Backtest: of the 1,942 customers predicted to return, 73% did, vs a 43% base rate (lift 1.68). |
+| **C. What should we offer them?** | Association rules (support, confidence, lift) → top-5 products not yet bought | 200 rules. Recommendations caught a newly bought product for 22.4% of customers, vs 16.1% for plain best sellers. |
 
 All numbers come from `artifacts/metrics.json`. The app reads them live, and each page
 explains its own numbers in plain English.
+
+## The app: 6 pages, "hub and spokes"
+
+1. **Home (live demo):** pick a typical customer of a segment or type 6 values, add products to a
+   basket → their segment on the PCA map, P(return) from the 3 models, and 5 products to offer.
+2. **Data:** the dataset, sample rows, the cleaning funnel, monthly sales, countries, revenue concentration.
+3. **Segmentation:** the 6 features, choosing k (elbow + silhouette), PCA map, segment profiles.
+4. **Prediction:** the time-based split, model comparison (ROC), the Time Machine backtest, KNN bias-variance.
+5. **Recommendation:** support / confidence / lift on a real rule, the top rules, hit-rate vs best sellers.
+6. **Insights:** one row per segment with a suggested action, and the limitations below.
 
 ## Run it locally (Windows; use `source .venv/bin/activate` on macOS / Linux)
 
@@ -42,15 +57,15 @@ synthetic files in `artifacts/mock/` and shows a "Mock data" badge.
 ## Project layout
 
 ```
-config.yaml            cutoff, horizon, seed, model settings, optional segment k / names override
-src/retailpulse/       all logic: ingest, clean, warehouse (DuckDB), features, cube, stats/,
-                       segment/, predict/, baskets/, app_data, viz/ (Plotly figures), pipeline
-app/Home.py, pages/    Streamlit app: 1 Data & Cube, 2 Segments & Stats, 3 Predictions,
-                       4 Customer 360 (pages only lay out; app/components/data.py reads artifacts)
+config.yaml            cutoff, horizon, seed, the 6 features, the 3 models, rule settings,
+                       optional segment k / names override
+src/retailpulse/       all logic: ingest, clean, warehouse (DuckDB), features, eda, segment/,
+                       predict/, baskets/, viz/ (Plotly figures), pipeline (v1 extras: stats/, cube)
+app/Home.py, pages/    Streamlit app (pages only lay out; app/components/data.py reads artifacts)
 artifacts/             pipeline outputs; only the app inputs + artifacts/mock/ are in git
 data/                  raw + cleaned data (downloaded by the pipeline, never committed)
 tests/                 pytest on a synthetic fixture, never the real dataset
-PLAN.md, PROGRESS.md   design and build log;  DEMO_SCRIPT.md: 8-minute walkthrough
+PLAN.md, PROGRESS.md   design and build log;  DEMO_SCRIPT.md: demo walkthrough
 ```
 
 ## Data and credit
@@ -66,7 +81,6 @@ data and derived artifacts in this repository are adapted from it.
 - **One cutoff:** the models are trained and tested on one time split (train snapshot
   2011-06-11, test snapshot 2011-09-09). Other periods may behave differently.
 - **Seasonality:** the November peak falls only in the test window, so the training data never
-  saw it.
-- **Expected spend is a typical-customer estimate:** P(return) × the back-transformed log-scale
-  prediction. That is closer to the median than the mean, so totals are underestimated.
-- Segment count and names come from an automatic rule and can be overridden in `config.yaml`.
+  saw it (32% of customers came back in the train window vs 43% in the test window).
+- **Recommendations show co-purchase, not cause:** rules say which products are bought together,
+  and they were checked only against what customers bought next (hit-rate), never in a live test.

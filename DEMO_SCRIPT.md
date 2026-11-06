@@ -1,5 +1,8 @@
 # RetailPulse: demo script (~8 minutes)
 
+> **Outdated: this script is for the v1 app (git tag `v1-full`: 4 pages, 5 classifiers, per-segment
+> rules).** P6b rewrites it for the v2 6-page app. Until then, do not use its pages or numbers.
+
 Follows the Guided Tour numbers page by page. Turn on **Guided Tour** in the sidebar first; it
 stays on across pages. All numbers below are the live values from `artifacts/metrics.json`
 (cutoff 2011-09-09, 90-day horizon). If you rename the segments or change k in `config.yaml`, the
