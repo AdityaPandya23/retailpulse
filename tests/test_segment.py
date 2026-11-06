@@ -239,3 +239,24 @@ def test_end_to_end_deterministic_and_config_k(synthetic_shop, seg_result):
     assert out.metrics["k"] == 2 and "config.yaml" in out.metrics["k_choice_reason"]
     assert out.metrics["segment_names"][0] == "Best"
     assert out.tables[C.SEGMENTS_PARQUET]["segment"].nunique() == 2
+
+
+def test_override_name_wins_over_matching_automatic_name():
+    # segment 0 is automatically "Champions"; the human names segment 1 "Champions" too
+    z = pd.DataFrame([_z(recency=-1, frequency=1, monetary=1), _z()])
+    assert CL.name_segments(z)[0] == "Champions"
+    names = CL.name_segments(z, overrides={1: "Champions"})
+    assert names == {0: "Champions 2", 1: "Champions"}
+    assert list(names) == [0, 1]
+
+
+def test_config_k_marks_the_used_k_as_chosen(seg_result):
+    f, lab, cfg, res = seg_result
+    auto = res.metrics["k"]
+    other = next(k for k in range(cfg.k_choice_range[0], cfg.k_choice_range[1] + 1) if k != auto)
+    out = CL.segment_customers(
+        f, lab, cfg=dataclasses.replace(cfg, k=other), n_subsamples=2, cv_folds=3
+    )
+    cand = pd.DataFrame(out.metrics["k_candidates"])
+    assert cand.loc[cand["chosen"], "k"].tolist() == [other]
+    assert cand.loc[cand["rule_choice"], "k"].tolist() == [out.metrics["auto_k"]]

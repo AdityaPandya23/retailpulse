@@ -177,30 +177,35 @@ NAMING_RULE = (
     "frequency/monetary -> Champions; high monetary + high recency -> At Risk High-Value; low "
     "tenure + low recency -> New Customers; high recency + below-average value -> Lost / "
     "Hibernating; high avg_basket_value + below-average frequency -> Big-Basket Occasionals; "
-    "otherwise Regulars. Duplicates get ' 2', ' 3' in segment-id (revenue) order."
+    "otherwise Regulars. Duplicates get ' 2', ' 3' in segment-id (revenue) order; names set in "
+    "config.yaml keep theirs."
 )
 
 
-def unique_names(names: dict[int, str]) -> dict[int, str]:
-    """Make names unique: the lowest segment id keeps a name, later ones get ' 2', ' 3', ..."""
+def unique_names(names: dict[int, str], keep: set[int] | frozenset = frozenset()) -> dict[int, str]:
+    """Make names unique: ids in `keep` (human overrides) claim their names first, then the
+    lowest segment id keeps a name and later ones get ' 2', ' 3', ..."""
     out, used = {}, set()
-    for seg in sorted(names):
+    for seg in sorted(names, key=lambda s: (s not in keep, s)):
         name, n = names[seg], 1
         while name in used:
             n += 1
             name = f"{names[seg]} {n}"
         out[seg] = name
         used.add(name)
-    return out
+    return dict(sorted(out.items()))
 
 
 def name_segments(z_means: pd.DataFrame, overrides: dict[int, str] | None = None) -> dict:
-    """{segment id: unique name}; `overrides` (config.yaml segment.names) win."""
+    """{segment id: unique name}; `overrides` (config.yaml segment.names) win, also when an
+    automatic name of another segment is the same (that one gets the ' 2' suffix)."""
     names = {int(s): name_one(z_means.loc[s]) for s in z_means.index}
+    kept = set()
     for seg, name in (overrides or {}).items():
         if int(seg) in names:
             names[int(seg)] = name
-    return unique_names(names)
+            kept.add(int(seg))
+    return unique_names(names, kept)
 
 
 # ---------------- end-to-end (pure) ----------------
@@ -276,6 +281,9 @@ def segment_customers(
     else:
         k, k_source = int(cfg.k), "config.yaml"
         k_reason = f"k = {k} set in config.yaml (the automatic rule would pick k = {auto_k})."
+    # "chosen" = the k actually used (config override included); "rule_choice" = automatic pick
+    cand["rule_choice"] = cand["chosen"]
+    cand["chosen"] = cand["k"] == k
 
     pipe = segment_pipeline(feats, k, seed).fit(raw)
     km_labels = pipe.named_steps["kmeans"].labels_
@@ -346,8 +354,18 @@ def segment_customers(
             "compete on mean ARI (ties -> smaller k); none eligible -> best silhouette."
         ),
         "k_candidates": cand[
-            ["k", "silhouette", "min_segment_share", "ari_mean", "eligible", "in_window", "chosen"]
+            [
+                "k",
+                "silhouette",
+                "min_segment_share",
+                "ari_mean",
+                "eligible",
+                "in_window",
+                "rule_choice",
+                "chosen",
+            ]
         ].to_dict(orient="records"),
+        "auto_k": auto_k,
         **quality,
         "wcss": float(pipe.named_steps["kmeans"].inertia_),
         "stability_ari": ari,
