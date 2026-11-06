@@ -154,7 +154,7 @@ def run_mock() -> dict:
     jsons = mock_mod.mock_quality_jsons()
     for path, obj in jsons.items():
         C.write_json(C.mock_path(path), obj)
-    models = mock_mod.build_mock_models(tables)
+    models = mock_mod.build_mock_models(tables, metrics)
     for path, payload in models.items():
         C.mock_path(path).parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(payload, C.mock_path(path))

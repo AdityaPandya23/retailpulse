@@ -160,3 +160,20 @@ k = 3 now but read k / names from metrics.json `segment` (overridable in config.
 - Rules: scope "overall" or "segment:<name>"; antecedents/consequents are " + "-joined descriptions (codes in
   *_codes). ROC first / PR last threshold is inf → drop before plotting thresholds.
 - Live test picker: reuse stats/tests.py functions on features_cutoff joined to segments.
+
+## P5 detail (updated after P4 — see PROGRESS.md)
+1. **Review**: `/code-review` of the P4 diff (app/, src/retailpulse/viz/, app_data, mock); click through every page
+   in a browser (light theme), Guided Tour on, at 1280 px and 1920 px; fix label collisions / empty states.
+2. **Deploy (Streamlit Community Cloud, free)**: entry point app/Home.py; requirements from pyproject (pin versions
+   used locally: streamlit 1.66, plotly 7.1, scikit-learn 1.9, pandas 3.1 — joblib models are version-bound);
+   `pip install -e .` equivalent (add `-e .` or `.` to requirements.txt so `retailpulse` imports).
+   Track ONLY the app inputs = contracts.APP_FILES (3.13 MB, 33 files: features_cutoff, labels, segments/*,
+   predictions/*, rules/*, customers/*, cube, eda/*, stats/*, quality/*.json, metrics.json, models/*.joblib) via
+   explicit `!artifacts/<path>` lines in .gitignore; never data/ or features_full. Budget: < 10 MB tracked.
+   Smoke: app shows no "Mock data" badge on the cloud.
+3. **DEMO_SCRIPT.md** (~8 min, follows the Guided Tour numbers): Home tiles → A: Page 1 (Sankey, missing-ID MAR,
+   cube drill-down + why customers aren't summed) → Page 2 (k evidence + override note, PCA, profiles, live test)
+   → B: Page 3 (Time Machine: predict, then reveal 73% vs 43%; models tied; KNN slider) → C: Page 4 (customer
+   15288: timeline, gauge vs actual, recs + fired rule, what-if) → close on limitations (registered customers
+   only, one cutoff, Nov peak only in test, expected spend is a typical-customer estimate).
+4. Human TODO: confirm or override k and segment names (config.yaml segment.k / segment.names) before the demo.

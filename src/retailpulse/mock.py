@@ -158,8 +158,15 @@ def _segment_tables(rng, f: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dic
             "dof": int(dof),
             "p_value": float(p),
             "cramers_v": cramers_v,
+            "uk_share_by_segment": {
+                int(s): float(v) for s, v in (table[False] / table.sum(axis=1)).items()
+            }
+            if False in table
+            else {},
             "conclusion": "MOCK: segment membership vs UK/non-UK (placeholder result).",
         },
+        "segment_names": dict(enumerate(SEGMENT_NAMES)),
+        "k_choice_reason": f"MOCK: k = {K} is a placeholder for the fake data.",
         "conclusion": f"MOCK: k = {K} segments (placeholder; real k and names come from P3).",
     }
     tables = {
@@ -213,6 +220,7 @@ def _prediction_tables(rng, f: pd.DataFrame, lab: pd.DataFrame) -> tuple[dict, d
             "test_ap": float(average_precision_score(y[test], p[test])),
             "accuracy": float((pred[test] == y[test]).mean()),
             "confusion": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
+            "threshold": 0.5,
         }
     classification = pd.concat(cls_rows, ignore_index=True)
     best = max(models, key=lambda m: models[m]["test_auc"])
@@ -262,6 +270,8 @@ def _prediction_tables(rng, f: pd.DataFrame, lab: pd.DataFrame) -> tuple[dict, d
             "mock": True,
             "models": models,
             "best_model": best,
+            "threshold": 0.5,
+            "knn_k": 20,
             "paired_t_auc": {
                 "model_a": best,
                 "model_b": "logistic",
@@ -569,7 +579,9 @@ def mock_quality_jsons() -> dict[Path, dict]:
     }
 
 
-def build_mock_models(tables: dict[Path, pd.DataFrame]) -> dict[Path, dict]:
+def build_mock_models(
+    tables: dict[Path, pd.DataFrame], metrics: dict | None = None
+) -> dict[Path, dict]:
     """Tiny fitted models with the real joblib payload layout (raw features in)."""
     from retailpulse.predict.classify import make_classifier
     from retailpulse.predict.dataset import FEATURES
@@ -583,7 +595,8 @@ def build_mock_models(tables: dict[Path, pd.DataFrame]) -> dict[Path, dict]:
     seg_pipe = segment_pipeline(C.FEATURE_COLUMNS, K, SEED).fit(f[C.FEATURE_COLUMNS])
     names = dict(zip(seg["segment"].astype(int), seg["segment_name"].astype(str), strict=True))
     df = f.merge(lab, on="customer_id")
-    clf = make_classifier("logistic").fit(df[FEATURES], df["returned_flag"])
+    best = ((metrics or {}).get("classify") or {}).get("best_model", "logistic")
+    clf = make_classifier(best, k=5).fit(df[FEATURES], df["returned_flag"])
     ret = df[df["next_spend"] > 0]
     reg = make_regressor("multiple_lr").fit(ret[FEATURES], np.log1p(ret["next_spend"]))
     return {
@@ -597,7 +610,7 @@ def build_mock_models(tables: dict[Path, pd.DataFrame]) -> dict[Path, dict]:
         C.CLASSIFIER_JOBLIB: {
             "pipeline": clf,
             "features": list(FEATURES),
-            "model": "logistic",
+            "model": best,
             "threshold": 0.5,
             "mock": True,
         },

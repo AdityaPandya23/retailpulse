@@ -41,8 +41,21 @@
       "dof": 3,
       "p_value": 0.6982739135914632,
       "cramers_v": 0.1891458064288387,
+      "uk_share_by_segment": {
+        "0": 0.6363636363636364,
+        "1": 0.6923076923076923,
+        "2": 0.75,
+        "3": 0.875
+      },
       "conclusion": "MOCK: segment membership vs UK/non-UK (placeholder result)."
     },
+    "segment_names": {
+      "0": "Mock segment A",
+      "1": "Mock segment B",
+      "2": "Mock segment C",
+      "3": "Mock segment D"
+    },
+    "k_choice_reason": "MOCK: k = 4 is a placeholder for the fake data.",
     "conclusion": "MOCK: k = 4 segments (placeholder; real k and names come from P3)."
   },
   "classify": {
@@ -66,7 +79,8 @@
           "fp": 3,
           "fn": 4,
           "tp": 2
-        }
+        },
+        "threshold": 0.5
       },
       "lda": {
         "cv_auc_mean": 0.640599795625736,
@@ -86,7 +100,8 @@
           "fp": 1,
           "fn": 4,
           "tp": 2
-        }
+        },
+        "threshold": 0.5
       },
       "qda": {
         "cv_auc_mean": 0.6366031236914258,
@@ -106,7 +121,8 @@
           "fp": 2,
           "fn": 3,
           "tp": 3
-        }
+        },
+        "threshold": 0.5
       },
       "naive_bayes": {
         "cv_auc_mean": 0.646049403635603,
@@ -126,7 +142,8 @@
           "fp": 1,
           "fn": 3,
           "tp": 3
-        }
+        },
+        "threshold": 0.5
       },
       "knn": {
         "cv_auc_mean": 0.5171452974465379,
@@ -146,10 +163,13 @@
           "fp": 2,
           "fn": 4,
           "tp": 2
-        }
+        },
+        "threshold": 0.5
       }
     },
     "best_model": "naive_bayes",
+    "threshold": 0.5,
+    "knn_k": 20,
     "paired_t_auc": {
       "model_a": "naive_bayes",
       "model_b": "logistic",

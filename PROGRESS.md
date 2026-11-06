@@ -65,5 +65,30 @@
 - Rules scopes: "overall", "segment:<name>"; recommendation = segment rules → overall rules (Σ conf × lift) → segment best sellers; never already-bought items.
 - ROC/PR curves keep sklearn's inf end thresholds. Mock rule scopes now use the same names.
 
-## Next: P4 App
-4 Streamlit pages on the real artifacts via app/components/data.py (see PLAN.md "P4 detail").
+## P4 App — done (2026-11-06)
+- P3 review first (744fa8b): no leakage / test-set tuning found; fixed 2 edge cases (config names now win over a
+  matching automatic name; k_candidates "chosen" = k actually used under a config override). Key numbers unchanged.
+- New stage app_data (after rules): customers/timeline.parquet (24,778 customer-months; "after" = label window only)
+  + rec_reasons.parquet (rule behind each "rule" rec); 220 + 143 KB. Mock set now covers EVERY app input (174 KB).
+- App: Home (KPIs, questions A/B/C) + 4 pages — 1 Data & Cube (Sankey, missing-ID, formats, monthly, countries,
+  Lorenz, cohorts, CUBE sunburst + slice/dice), 2 Segments & Stats (3D PCA, biplot/scree, k panels, profile cards,
+  box plots, parallel lines, baseline, χ², Q-Q, Poisson vs NB, Pearson vs Spearman, live t vs U test),
+  3 Predictions (Time Machine reveal, ROC/PR, model table + tie note, confusion, KNN k slider, regression),
+  4 Customer 360 (timeline, segment badge, gauge + actual outcome, expected spend, recs + fired rule, what-if).
+- Figures in src/retailpulse/viz/ (palette, common, data_cube, segments, predictions, customer); pages only lay out.
+- Real artifacts (AppTest): no exceptions, no mock badge; warm render 0.2–1.1 s per page (cold ≤ 2.3 s).
+  `streamlit run` headless: /_stcore/health ok. App needs 3.13 MB of artifacts (33 files, none > 5 MB).
+- Tests: 215 pass (+101: app_data, viz helpers, 8 figure/AppTest files incl. widget interaction). Ruff clean.
+
+## P4 decisions
+- app/components/data.py is the only reader: mtime-keyed caches; per-file fallback to artifacts/mock + per-section
+  metrics fallback, both listed in a sidebar "Mock data" badge; RETAILPULSE_ARTIFACTS overrides the root (tests).
+- Okabe-Ito, fixed colour per segment id + per model (models also get a dash: qda/NB pair is 7.6 ΔE deutan);
+  yellow (slot 6) too light → names always shown, dark marker ring. Template set on every figure + theme=None
+  (Streamlit overrides plotly's default). k / names / best model never hard-coded (metrics.json).
+- Cube: grouping sets chosen by grouping_id; distinct customers never summed. Default customer = typical segment-0
+  member (15288). What-if baseline = live models on the real features (delta starts at 0).
+- Two subagents built pages 1–2 / 3–4 in parallel after the shared foundation; I integrated and reviewed.
+
+## Next: P5 Polish + Ship
+Review, browser walk-through, deploy to Streamlit Community Cloud, DEMO_SCRIPT.md (see PLAN.md "P5 detail").

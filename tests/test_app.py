@@ -54,7 +54,7 @@ def test_data_falls_back_per_file_and_section(mock_artifacts, tmp_path, monkeypa
     assert "segments/segments.parquet" in listed and "metrics.json [classify]" in listed
     assert "metrics.json [segment]" not in listed
     assert data.table(C.SEGMENTS_PARQUET) is not None
-    assert data.model(C.CLASSIFIER_JOBLIB)["model"] == "logistic"
+    assert data.model(C.CLASSIFIER_JOBLIB)["model"] == data.metrics("classify")["best_model"]
 
 
 def test_data_on_mock_root(mock_artifacts):

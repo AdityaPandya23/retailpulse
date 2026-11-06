@@ -53,7 +53,7 @@ def is_skewed(values, threshold: float = SKEW_LOG_THRESHOLD) -> bool:
 def log_axis(fig: go.Figure, axis: str = "y", title: str | None = None, **kwargs) -> go.Figure:
     """Switch an axis ("x", "y", "y2" or "yaxis2" ...) to log scale with readable ticks."""
     name = axis if "axis" in axis else f"{axis[0]}axis{axis[1:]}"
-    update = {"type": "log", "dtick": 1, "minor": {"ticks": "", "showgrid": False}, **kwargs}
+    update = {"type": "log", "minor": {"ticks": "", "showgrid": False}, **kwargs}
     if title is not None:
         update["title"] = {"text": f"{title} (log scale)"}
     fig.update_layout({name: update})
