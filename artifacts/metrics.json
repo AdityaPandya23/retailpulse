@@ -1,0 +1,911 @@
+{
+  "features": {
+    "cutoff": "2011-09-09",
+    "horizon_days": 90,
+    "label_window": [
+      "2011-09-09",
+      "2011-12-08"
+    ],
+    "label_window_complete": true,
+    "data_end": "2011-12-09 12:50:00",
+    "n_customers_cutoff": 5278,
+    "n_customers_full": 5878,
+    "n_new_after_cutoff": 600,
+    "n_returned": 2281,
+    "returned_rate": 0.4322,
+    "mean_next_spend_returners": 1243.42,
+    "median_next_spend_returners": 532.82,
+    "skewness_cutoff": {
+      "recency": 0.67,
+      "frequency": 11.07,
+      "monetary": 23.77,
+      "tenure": -0.63,
+      "avg_basket_value": 13.66,
+      "mean_interpurchase_days": 1.28,
+      "n_distinct_products": 6.12,
+      "return_rate": 8.01,
+      "non_uk_share": 2.9
+    },
+    "skewness_log1p_cutoff": {
+      "recency": -0.97,
+      "frequency": 1.06,
+      "monetary": 0.28,
+      "tenure": -2.58,
+      "avg_basket_value": -0.02,
+      "mean_interpurchase_days": -0.36,
+      "n_distinct_products": -0.33,
+      "return_rate": 6.63,
+      "non_uk_share": 2.9
+    },
+    "conclusion": "43.2% of the 5,278 customers who bought before 2011-09-09 bought again in the next 90 days (median spend of those who did: \u00a3533); 600 customers first appear after the cutoff and are outside the modelling set."
+  },
+  "stats": {
+    "order_value_lognormal": {
+      "title": "Average order value per customer: lognormal vs normal",
+      "data": "features_full.avg_basket_value (GBP)",
+      "n": 5878,
+      "mean": 385.18084102650045,
+      "median": 279.24267857142854,
+      "skewness": 57.117987070630015,
+      "skewness_of_log": 0.01761280157112525,
+      "fits": {
+        "lognormal": {
+          "params": {
+            "mu_log": 5.6119915721967875,
+            "sigma_log": 0.7411848039548882
+          },
+          "loglik": -39567.315084146176,
+          "aic": 79138.63016829235
+        },
+        "normal": {
+          "params": {
+            "mean": 385.18084102650045,
+            "sd": 1214.1831636539348
+          },
+          "loglik": -50085.05884250825,
+          "aic": 100174.1176850165
+        }
+      },
+      "best_fit": "lognormal",
+      "delta_aic": 21035.487516724155,
+      "conclusion": "Average order value per customer is right-skewed (median \u00a3279 vs mean \u00a3385, skewness 57.1); a lognormal fits far better than a normal (AIC 79,139 vs 100,174), so it is analysed on a log scale."
+    },
+    "frequency_poisson_vs_nbinom": {
+      "title": "Repeat orders per customer: Poisson vs negative binomial",
+      "data": "features_full.frequency - 1 (orders after the first)",
+      "n": 5878,
+      "mean": 5.289384144266758,
+      "variance": 169.2446414106861,
+      "dispersion_ratio": 31.99704101547113,
+      "max": 397,
+      "fits": {
+        "poisson": {
+          "params": {
+            "mu": 5.289384144266758
+          },
+          "loglik": -39894.39736248894,
+          "aic": 79790.79472497788
+        },
+        "nbinom": {
+          "params": {
+            "size_r": 0.47168867187239283,
+            "prob_p": 0.08187514494713512,
+            "mu": 5.289384144266758,
+            "alpha": 2.1200424339860606
+          },
+          "loglik": -15516.141977890155,
+          "aic": 31036.28395578031
+        }
+      },
+      "best_fit": "nbinom",
+      "delta_aic": 48754.51076919757,
+      "tail_above_max_k": {
+        "k": 30,
+        "observed": 135,
+        "poisson": 1.1496848149130099e-10,
+        "nbinom": 117.50678663928453
+      },
+      "conclusion": "Repeat orders per customer (mean 5.3) are overdispersed: variance/mean = 32.0 where a Poisson needs 1, and the negative binomial fits far better (AIC 31,036 vs 79,791), so customers differ strongly in how often they buy."
+    },
+    "gap_exponential": {
+      "title": "Inter-purchase gap: exponential vs Weibull",
+      "data": "days between consecutive purchase days, pooled over customers (all sales)",
+      "n_gaps": 27229,
+      "mean": 59.01825259833266,
+      "median": 31.0,
+      "cv": 1.3261905129890168,
+      "fits": {
+        "exponential": {
+          "params": {
+            "scale_days": 59.01825259833266,
+            "rate_per_day": 0.01694391067125988
+          },
+          "loglik": -138264.6894861831,
+          "aic": 276531.3789723662
+        },
+        "weibull": {
+          "params": {
+            "shape": 0.8472507193914898,
+            "scale_days": 53.6238532730498
+          },
+          "loglik": -137531.82883558073,
+          "aic": 275067.65767116146
+        }
+      },
+      "best_fit": "weibull",
+      "delta_aic": 1463.7213012047578,
+      "conclusion": "Days between a customer's purchase days (median 31, mean 59, coefficient of variation 1.33; an exponential has 1) are only roughly exponential: a Weibull with shape 0.85 fits far better (AIC 275,068 vs 276,531), i.e. more very short gaps and a longer tail than a memoryless process."
+    },
+    "basket_repeat_vs_onetime": {
+      "title": "Average basket value: repeat vs one-time customers (Welch t vs Mann-Whitney U)",
+      "data": "features_full (repeat = 2+ invoices)",
+      "groups": {
+        "repeat customers": {
+          "n": 4255,
+          "mean": 400.4278311524723,
+          "median": 292.7357142857143,
+          "sd": 1378.1017408037708
+        },
+        "one-time customers": {
+          "n": 1623,
+          "mean": 345.2079864448552,
+          "median": 228.96,
+          "sd": 599.5062323756641
+        }
+      },
+      "alpha": 0.05,
+      "welch_t": {
+        "t": 2.136866015477413,
+        "df": 5786.564143305913,
+        "p_value": 0.03265070488006335,
+        "cohens_d": 0.045480671326073877,
+        "effect": "negligible"
+      },
+      "mann_whitney": {
+        "U": 4112074.5,
+        "p_value": 9.104775817537397e-30,
+        "rank_biserial": 0.19089339279004158,
+        "effect": "small"
+      },
+      "tests_agree": true,
+      "conclusion": "Repeat customers have higher average basket value than one-time customers (median \u00a3293 vs \u00a3229; Mann-Whitney p < 0.001, r = +0.19, small); Welch's t-test on the means (\u00a3400 vs \u00a3345, p = 0.033, d = +0.05) agrees."
+    },
+    "paired_spend_y1_y2": {
+      "title": "Same customers' spend, year 1 vs year 2 (paired t-test)",
+      "data": "sales of customers with purchases in both years",
+      "year1": [
+        "2009-12-01",
+        "2010-11-30"
+      ],
+      "year2": [
+        "2010-12-01",
+        "2011-11-30"
+      ],
+      "n_customers": 2713,
+      "n_year1_only": 1553,
+      "n_year2_only": 1584,
+      "alpha": 0.05,
+      "mean_year1": 2719.1705495761153,
+      "mean_year2": 2533.276809067453,
+      "median_year1": 1066.3,
+      "median_year2": 840.21,
+      "mean_change": -185.89374050866203,
+      "median_change": -127.62,
+      "share_increased": 0.4098783634353115,
+      "paired_t": {
+        "t": -1.8062060696405224,
+        "df": 2712,
+        "p_value": 0.0709969749017147,
+        "cohens_dz": -0.03467707042728942,
+        "effect": "negligible"
+      },
+      "wilcoxon": {
+        "W": 1449354.0,
+        "p_value": 1.9317192227213827e-21
+      },
+      "tests_agree": false,
+      "conclusion": "No significant change in mean spend for the 2,713 customers active in both years (\u00a32,719 -> \u00a32,533, -\u00a3186; paired t p = 0.071); the Wilcoxon signed-rank test (median change -\u00a3128, 41% spent more, p < 0.001) disagrees: the typical customer spent less, but a few very large changes make the mean change too noisy for the t-test."
+    },
+    "correlation": {
+      "title": "Customer features: Pearson vs Spearman correlation, covariance",
+      "data": "features_full",
+      "n": 5878,
+      "features": [
+        "recency",
+        "frequency",
+        "monetary",
+        "tenure",
+        "avg_basket_value",
+        "mean_interpurchase_days",
+        "n_distinct_products",
+        "return_rate",
+        "non_uk_share"
+      ],
+      "strongest_spearman": {
+        "x": "frequency",
+        "y": "monetary",
+        "pearson": 0.6279196725141092,
+        "spearman": 0.858337861574004,
+        "gap": 0.23041818905989486
+      },
+      "largest_pearson_spearman_gaps": [
+        {
+          "x": "frequency",
+          "y": "return_rate",
+          "pearson": 0.007,
+          "spearman": 0.4311,
+          "gap": 0.4241
+        },
+        {
+          "x": "recency",
+          "y": "monetary",
+          "pearson": -0.125,
+          "spearman": -0.512,
+          "gap": -0.3869
+        },
+        {
+          "x": "monetary",
+          "y": "return_rate",
+          "pearson": 0.0426,
+          "spearman": 0.4275,
+          "gap": 0.3849
+        }
+      ],
+      "variances": {
+        "recency": 43829.080942264154,
+        "frequency": 169.24464141068614,
+        "monetary": 208538226.35996124,
+        "tenure": 49769.54674690172,
+        "avg_basket_value": 1474491.6041017845,
+        "mean_interpurchase_days": 34503.47632440864,
+        "n_distinct_products": 13540.436661814438,
+        "return_rate": 0.00732259732590633,
+        "non_uk_share": 0.08177300066979505
+      },
+      "conclusion": "Strongest monotonic link: frequency-monetary (Spearman \u03c1 = 0.86, Pearson r = 0.63); the two disagree most on frequency-return_rate (r = 0.01 vs \u03c1 = 0.43) because a few extreme customers dominate Pearson, and covariances depend on units (monetary in \u00a3\u00b2), so models use log1p + standardised features."
+    }
+  },
+  "eda": {
+    "n_customers": 5878,
+    "gini": 0.7415334514036174,
+    "top_1pct_revenue_share": 0.31961946893570614,
+    "top_10pct_revenue_share": 0.6392667568898335,
+    "top_20pct_revenue_share": 0.7724848472520354,
+    "uk_revenue_share": 0.8281667347183493,
+    "n_countries": 41,
+    "peak_month": "2010-11-01",
+    "peak_month_revenue": 1166460.022,
+    "skewness_full": {
+      "recency": 0.89,
+      "frequency": 12.64,
+      "monetary": 25.07,
+      "tenure": -0.62,
+      "avg_basket_value": 57.13,
+      "mean_interpurchase_days": 1.38,
+      "n_distinct_products": 6.22,
+      "return_rate": 8.11,
+      "non_uk_share": 2.87
+    },
+    "conclusion": "Spend is highly concentrated: the top 20% of customers bring 77% of revenue (top 1%: 32%, Gini 0.74); the UK brings 83% of revenue and the peak month is November 2010."
+  },
+  "segment": {
+    "k": 3,
+    "k_source": "automatic rule",
+    "k_choice_reason": "Among k = 3-7, every segment holds >= 3% of customers for k = 3, 4, 5, 6, 7; the best silhouette is k = 3 (0.283). No other eligible k is within 0.02 of it, so k = 3.",
+    "k_rule": "within k = 3-7: keep k whose smallest segment >= 3% of customers; best silhouette; eligible k within 0.02 of it compete on mean ARI (ties -> smaller k); none eligible -> best silhouette.",
+    "k_candidates": [
+      {
+        "k": 3,
+        "silhouette": 0.2828123001184217,
+        "min_segment_share": 0.25502084122773777,
+        "ari_mean": 0.9837745566389231,
+        "eligible": true,
+        "in_window": true,
+        "rule_choice": true,
+        "chosen": true
+      },
+      {
+        "k": 4,
+        "silhouette": 0.24146645967601074,
+        "min_segment_share": 0.207086017430845,
+        "ari_mean": 0.9611581525682433,
+        "eligible": true,
+        "in_window": false,
+        "rule_choice": false,
+        "chosen": false
+      },
+      {
+        "k": 5,
+        "silhouette": 0.21734649415537738,
+        "min_segment_share": 0.13319439181508147,
+        "ari_mean": 0.9397414542632992,
+        "eligible": true,
+        "in_window": false,
+        "rule_choice": false,
+        "chosen": false
+      },
+      {
+        "k": 6,
+        "silhouette": 0.21415266433459101,
+        "min_segment_share": 0.12087912087912088,
+        "ari_mean": 0.801392463880161,
+        "eligible": true,
+        "in_window": false,
+        "rule_choice": false,
+        "chosen": false
+      },
+      {
+        "k": 7,
+        "silhouette": 0.21200821959989155,
+        "min_segment_share": 0.10458507010231148,
+        "ari_mean": 0.8716141248022868,
+        "eligible": true,
+        "in_window": false,
+        "rule_choice": false,
+        "chosen": false
+      }
+    ],
+    "auto_k": 3,
+    "silhouette": 0.2828123001184217,
+    "davies_bouldin": 1.3185070869130315,
+    "calinski_harabasz": 2335.3647398911735,
+    "wcss": 19595.385024790587,
+    "stability_ari": {
+      "mean": 0.9837745566389231,
+      "std": 0.009851291034937757,
+      "values": [
+        0.9855320867914286,
+        0.9802844005801317,
+        0.9919195466983315,
+        0.9670642336226879,
+        0.9903788285672221,
+        0.9950029626201465,
+        0.9686660753154733,
+        0.9797519069270897,
+        0.9856227156163073,
+        0.9935228096504127
+      ]
+    },
+    "stability_ari_by_k": {
+      "3": {
+        "mean": 0.9837745566389231,
+        "std": 0.009851291034937757
+      },
+      "4": {
+        "mean": 0.9611581525682433,
+        "std": 0.03708446692348817
+      },
+      "5": {
+        "mean": 0.9397414542632992,
+        "std": 0.04712549635357881
+      },
+      "6": {
+        "mean": 0.801392463880161,
+        "std": 0.2166827681010728
+      },
+      "7": {
+        "mean": 0.8716141248022868,
+        "std": 0.05734834560892141
+      }
+    },
+    "stability_method": "10 random 80% subsamples (np.random.default_rng(42)); K-Means fit on each subsample predicts all customers; ARI vs the full fit.",
+    "pca_explained_variance": [
+      0.5192051989041575,
+      0.20752935120468616,
+      0.14080561664358454,
+      0.06755340374574978,
+      0.052335567165019,
+      0.012226092843402044,
+      0.0003447694934010618
+    ],
+    "pca_cumulative_variance": [
+      0.5192051989041575,
+      0.7267345501088437,
+      0.8675401667524283,
+      0.9350935704981781,
+      0.9874291376631971,
+      0.9996552305065991,
+      1.0000000000000002
+    ],
+    "baseline": {
+      "kmeans": {
+        "silhouette": 0.2828123001184217,
+        "davies_bouldin": 1.3185070869130315,
+        "calinski_harabasz": 2335.3647398911735,
+        "auc_returned": 0.717727962308652,
+        "auc_returned_std": 0.01287413751945664,
+        "auc_folds": [
+          0.7113834064327486,
+          0.7092817982456141,
+          0.7399732595901997,
+          0.7177917142606098,
+          0.7102096330140879
+        ]
+      },
+      "rfm_quartile": {
+        "silhouette": 0.16577413168608807,
+        "davies_bouldin": 1.9241654687464134,
+        "calinski_harabasz": 1651.8216753802214,
+        "auc_returned": 0.7448568710229831,
+        "auc_returned_std": 0.014148657205588633,
+        "auc_folds": [
+          0.7490277777777778,
+          0.7252412280701754,
+          0.7634514855174379,
+          0.748173124798641,
+          0.738390738950883
+        ]
+      },
+      "conclusion": "K-Means separates customers better than the RFM-quartile baseline on the same scaled features (silhouette 0.28 vs 0.17, Davies-Bouldin 1.32 vs 1.92, Calinski-Harabasz 2335 vs 1652) and predicts who buys again worse: CV ROC-AUC 0.718 vs 0.745."
+    },
+    "chi2_segment_uk": {
+      "chi2": 26.024137777051784,
+      "dof": 2,
+      "p_value": 2.2332137006889946e-06,
+      "cramers_v": 0.07021881268842198,
+      "share_expected_below_5": 0.0,
+      "uk_share_by_segment": {
+        "0": 0.9089165867689357,
+        "1": 0.8833580980683506,
+        "2": 0.9349945828819068
+      },
+      "conclusion": "Chi-square 26.0 (dof 2): segment membership and UK/non-UK are associated (p = 2.23e-06 < 0.05); the association is negligible (Cramer's V 0.07)."
+    },
+    "segment_names": {
+      "0": "Champions",
+      "1": "New Customers",
+      "2": "Lost / Hibernating"
+    },
+    "names_source": "automatic rule",
+    "naming_rule": "Segment means of the log1p + standardised clustering features (z = SD units vs all customers; high/low = |z| > 0.5), first match wins: low recency + high frequency/monetary -> Champions; high monetary + high recency -> At Risk High-Value; low tenure + low recency -> New Customers; high recency + below-average value -> Lost / Hibernating; high avg_basket_value + below-average frequency -> Big-Basket Occasionals; otherwise Regulars. Duplicates get ' 2', ' 3' in segment-id (revenue) order; names set in config.yaml keep theirs.",
+    "segment_sizes": {
+      "0": 2086,
+      "1": 1346,
+      "2": 1846
+    },
+    "features_used": [
+      "recency",
+      "frequency",
+      "monetary",
+      "tenure",
+      "avg_basket_value",
+      "mean_interpurchase_days",
+      "n_distinct_products"
+    ],
+    "log1p_features": [
+      "frequency",
+      "monetary",
+      "avg_basket_value",
+      "mean_interpurchase_days",
+      "n_distinct_products"
+    ],
+    "excluded_from_clustering": [
+      "return_rate",
+      "non_uk_share"
+    ],
+    "scaling": "log1p on frequency, monetary, avg_basket_value, mean_interpurchase_days, n_distinct_products, then StandardScaler (z-scores) fitted on all 5,278 features_cutoff customers; the same steps sit in the saved pipeline.",
+    "n_customers": 5278,
+    "seed": 42,
+    "override": "k and names are chosen by the rules above; to override, set segment.k and/or segment.names ({id: name}) in config.yaml and rerun the pipeline.",
+    "conclusion": "K-Means on 7 log1p + standardised features splits the 5,278 customers into k = 3 segments (automatic rule; silhouette 0.28, mean subsample ARI 0.98); 'Champions' is 40% of customers but 88% of revenue."
+  },
+  "classify": {
+    "train_cutoff": "2011-06-11",
+    "train_label_window": [
+      "2011-06-11",
+      "2011-09-09"
+    ],
+    "test_cutoff": "2011-09-09",
+    "test_label_window": [
+      "2011-09-09",
+      "2011-12-08"
+    ],
+    "n_train": 4976,
+    "n_test": 5278,
+    "base_rate_train": 0.3195337620578778,
+    "base_rate_test": 0.4321712769988632,
+    "cv_folds": 5,
+    "selection": "max mean CV ROC-AUC on train (test never used for choices)",
+    "threshold_rule": "max F1 on train out-of-fold probabilities, per model",
+    "knn_k": 76,
+    "knn_k_note": "k chosen by the same CV folds, so the KNN CV AUC is slightly optimistic",
+    "models": {
+      "logistic": {
+        "cv_auc_mean": 0.8214825517003834,
+        "cv_auc_std": 0.01131900406873988,
+        "cv_aucs": [
+          0.8192983432589377,
+          0.8221621470973497,
+          0.8125052256068672,
+          0.8403565489627751,
+          0.8130904935759873
+        ],
+        "train_oof_auc": 0.8213360972112324,
+        "threshold": 0.3590504018577426,
+        "test_auc": 0.7956183569218788,
+        "test_ap": 0.7608921534361214,
+        "accuracy": 0.7300113679424024,
+        "confusion": {
+          "tn": 2472,
+          "fp": 525,
+          "fn": 900,
+          "tp": 1381
+        }
+      },
+      "lda": {
+        "cv_auc_mean": 0.8174947946721186,
+        "cv_auc_std": 0.01315570808668258,
+        "cv_aucs": [
+          0.8147112298473126,
+          0.8184508049757067,
+          0.8058210938008044,
+          0.8393485874604016,
+          0.8091422572763673
+        ],
+        "train_oof_auc": 0.8171211834152466,
+        "threshold": 0.34853166024169774,
+        "test_auc": 0.7929156688472777,
+        "test_ap": 0.75502528317379,
+        "accuracy": 0.7250852595680182,
+        "confusion": {
+          "tn": 2547,
+          "fp": 450,
+          "fn": 1001,
+          "tp": 1280
+        }
+      },
+      "qda": {
+        "cv_auc_mean": 0.8052442320193289,
+        "cv_auc_std": 0.008170978600244853,
+        "cv_aucs": [
+          0.8017337340680135,
+          0.8072378138847858,
+          0.7982079652183607,
+          0.8185947994760457,
+          0.8004468474494393
+        ],
+        "train_oof_auc": 0.8054133371968185,
+        "threshold": 0.4301399693383614,
+        "test_auc": 0.7801693261287006,
+        "test_ap": 0.7358045467899965,
+        "accuracy": 0.7140962485790072,
+        "confusion": {
+          "tn": 2281,
+          "fp": 716,
+          "fn": 793,
+          "tp": 1488
+        }
+      },
+      "naive_bayes": {
+        "cv_auc_mean": 0.8108162573997403,
+        "cv_auc_std": 0.012224428944650092,
+        "cv_aucs": [
+          0.8114970037661638,
+          0.8061926925113571,
+          0.803967745231924,
+          0.8315543045065634,
+          0.8008695409826927
+        ],
+        "train_oof_auc": 0.8106368435325628,
+        "threshold": 0.5068531572486273,
+        "test_auc": 0.7917149942577387,
+        "test_ap": 0.7524315949196654,
+        "accuracy": 0.7273588480485033,
+        "confusion": {
+          "tn": 2453,
+          "fp": 544,
+          "fn": 895,
+          "tp": 1386
+        }
+      },
+      "knn": {
+        "cv_auc_mean": 0.8229172556821375,
+        "cv_auc_std": 0.011023405954387442,
+        "cv_aucs": [
+          0.8165989499267176,
+          0.8217742909432104,
+          0.8203087985284692,
+          0.8418684912163356,
+          0.8140357477959551
+        ],
+        "train_oof_auc": 0.8219487753866271,
+        "threshold": 0.3684210526315789,
+        "test_auc": 0.791302189227076,
+        "test_ap": 0.7535659834961845,
+        "accuracy": 0.7300113679424024,
+        "confusion": {
+          "tn": 2487,
+          "fp": 510,
+          "fn": 915,
+          "tp": 1366
+        },
+        "k": 76
+      }
+    },
+    "best_model": "knn",
+    "threshold": 0.3684210526315789,
+    "paired_t_auc": {
+      "model_a": "knn",
+      "model_b": "logistic",
+      "mean_auc_diff": 0.0014347039817541596,
+      "t": 0.8200283169562513,
+      "p_value": 0.45825183593278596,
+      "t_corrected": 0.5467236940953065,
+      "p_value_corrected": 0.6136365512934323,
+      "conclusion": "Across the 5 train folds knn beats logistic by +0.0014 ROC-AUC on average (paired t = 0.82, p = 0.458): not significant at alpha 0.05: they rank customers about equally well; the corrected t (folds share training rows) gives p = 0.614."
+    },
+    "reference": {
+      "auc": 0.5,
+      "majority_class": 0,
+      "accuracy": 0.5678287230011368,
+      "ap": 0.4321712769988632,
+      "note": "always predicting the majority class of the test window / random ranking"
+    },
+    "conclusion": "knn has the best 5-fold CV ROC-AUC on the train snapshot (0.823 \u00b1 0.011); on the future window it scores ROC-AUC 0.791 (vs 0.5 for guessing) and accuracy 73.0% at its train-chosen threshold 0.37 (always guessing the majority class: 56.8%). Base rate differs: 32.0% returned in the train window vs 43.2% in the test window (only the test window contains the November peak season)."
+  },
+  "regress": {
+    "train_cutoff": "2011-06-11",
+    "train_label_window": [
+      "2011-06-11",
+      "2011-09-09"
+    ],
+    "test_cutoff": "2011-09-09",
+    "test_label_window": [
+      "2011-09-09",
+      "2011-12-08"
+    ],
+    "target": "log1p(next_spend)",
+    "population": "customers with next_spend > 0 (returners)",
+    "n_train": 1590,
+    "n_test": 2281,
+    "selection": "min mean CV RMSE on train (test never used for choices)",
+    "train_predictions": "out-of-fold",
+    "knn_k": 13,
+    "models": {
+      "simple_lr": {
+        "features": [
+          "frequency"
+        ],
+        "cv_rmse_mean": 0.9397797632258085,
+        "cv_rmse_std": 0.04656573439812406,
+        "rmse": 0.9752807423372615,
+        "mae": 0.7503631032957543,
+        "r2": 0.1971942094147422,
+        "rmse_gbp": 4676.115154219219,
+        "mae_gbp": 884.5191912056134,
+        "coefficients_scaled": {
+          "frequency": 0.5456483355708558
+        }
+      },
+      "multiple_lr": {
+        "features": [
+          "recency",
+          "frequency",
+          "monetary",
+          "tenure",
+          "avg_basket_value",
+          "mean_interpurchase_days",
+          "n_distinct_products",
+          "return_rate",
+          "non_uk_share"
+        ],
+        "cv_rmse_mean": 0.7428297765064575,
+        "cv_rmse_std": 0.050104928248967874,
+        "rmse": 0.8320468416151666,
+        "mae": 0.6428980550502293,
+        "r2": 0.4156853817926869,
+        "rmse_gbp": 3764.807985653799,
+        "mae_gbp": 735.6136195986003,
+        "coefficients_scaled": {
+          "recency": 0.05911629404550643,
+          "frequency": 1.593107934069263,
+          "monetary": -1.0946050187405445,
+          "tenure": -0.23894819585976523,
+          "avg_basket_value": 1.1061305393132506,
+          "mean_interpurchase_days": 0.06230600790291236,
+          "n_distinct_products": -0.09389125017965741,
+          "return_rate": -0.02536010056678654,
+          "non_uk_share": 0.04381906132743939
+        }
+      },
+      "knn": {
+        "features": [
+          "recency",
+          "frequency",
+          "monetary",
+          "tenure",
+          "avg_basket_value",
+          "mean_interpurchase_days",
+          "n_distinct_products",
+          "return_rate",
+          "non_uk_share"
+        ],
+        "cv_rmse_mean": 0.7758347234587006,
+        "cv_rmse_std": 0.031031858651817196,
+        "rmse": 0.8499075794767829,
+        "mae": 0.6595763306680487,
+        "r2": 0.39033031155481834,
+        "rmse_gbp": 4325.368803665347,
+        "mae_gbp": 794.0193966381336,
+        "k": 13
+      }
+    },
+    "best_model": "multiple_lr",
+    "reference_mean": {
+      "rmse": 1.0997880206273547,
+      "mae": 0.8440420727188275,
+      "r2": -0.020867007371346835,
+      "rmse_gbp": 4835.2791102075025,
+      "mae_gbp": 968.0974211661596,
+      "note": "predict the train mean of log1p(next_spend)"
+    },
+    "expected_spend": "expected spend = p_return x expm1(prediction)",
+    "expected_spend_note": "expm1 of a log-scale prediction estimates a typical (median-like) spend, not the mean, so expected spend is conservative",
+    "conclusion": "multiple_lr has the lowest CV RMSE on train (0.743 on the log scale); on test returners it reaches RMSE 0.832, R\u00b2 0.42 (predicting the mean: RMSE 1.100), also the lowest test RMSE. In pounds the RMSE is \u00a33,765: spend is hard to predict exactly."
+  },
+  "backtest": {
+    "model": "knn",
+    "threshold": 0.3684210526315789,
+    "n_customers": 5278,
+    "n_predicted_return": 1876,
+    "n_actually_returned": 2281,
+    "share_actually_returned": 0.7281449893390192,
+    "base_rate": 0.4321712769988632,
+    "lift": 1.684852807422772,
+    "precision": 0.7281449893390192,
+    "recall": 0.5988601490574309,
+    "deciles": [
+      {
+        "decile": 1,
+        "n": 528,
+        "mean_p": 0.8452452153110048,
+        "return_rate": 0.8958333333333334,
+        "lift": 2.0728664328510886
+      },
+      {
+        "decile": 2,
+        "n": 528,
+        "mean_p": 0.6303329346092504,
+        "return_rate": 0.7613636363636364,
+        "lift": 1.7617173488501854
+      },
+      {
+        "decile": 3,
+        "n": 528,
+        "mean_p": 0.4812848883572568,
+        "return_rate": 0.6401515151515151,
+        "lift": 1.481244935102892
+      },
+      {
+        "decile": 4,
+        "n": 528,
+        "mean_p": 0.3649571371610845,
+        "return_rate": 0.4943181818181818,
+        "lift": 1.14380156231318
+      },
+      {
+        "decile": 5,
+        "n": 527,
+        "mean_p": 0.2606361729751323,
+        "return_rate": 0.41366223908918404,
+        "lift": 0.9571719850559901
+      },
+      {
+        "decile": 6,
+        "n": 528,
+        "mean_p": 0.1951255980861244,
+        "return_rate": 0.3352272727272727,
+        "lift": 0.7756815192698576
+      },
+      {
+        "decile": 7,
+        "n": 528,
+        "mean_p": 0.15218799840510366,
+        "return_rate": 0.2765151515151515,
+        "lift": 0.6398276938610126
+      },
+      {
+        "decile": 8,
+        "n": 528,
+        "mean_p": 0.11106957735247208,
+        "return_rate": 0.23674242424242425,
+        "lift": 0.5477976831001821
+      },
+      {
+        "decile": 9,
+        "n": 528,
+        "mean_p": 0.0676584928229665,
+        "return_rate": 0.16287878787878787,
+        "lift": 0.37688480597292523
+      },
+      {
+        "decile": 10,
+        "n": 527,
+        "mean_p": 0.030335563767102766,
+        "return_rate": 0.10436432637571158,
+        "lift": 0.2414883448535755
+      }
+    ],
+    "conclusion": "Using knn (threshold 0.37), we predicted 1,876 of 5,278 customers would buy again within 90 days of 2011-09-09; 73% of them did vs a base rate of 43% (lift 1.68), and they include 60% of all who came back."
+  },
+  "rules": {
+    "min_support": 0.01,
+    "min_support_by_scope": {
+      "overall": 0.01,
+      "segment:Champions": 0.01,
+      "segment:New Customers": 0.01,
+      "segment:Lost / Hibernating": 0.01001669449081803
+    },
+    "min_confidence": 0.3,
+    "n_invoices": {
+      "overall": 29962,
+      "segment:Champions": 23861,
+      "segment:New Customers": 3106,
+      "segment:Lost / Hibernating": 2995
+    },
+    "n_rules": {
+      "overall": 200,
+      "segment:Champions": 200,
+      "segment:New Customers": 170,
+      "segment:Lost / Hibernating": 94
+    },
+    "n_rules_before_cap": {
+      "overall": 549,
+      "segment:Champions": 786,
+      "segment:New Customers": 170,
+      "segment:Lost / Hibernating": 94
+    },
+    "segments_used": true,
+    "top_rule": {
+      "scope": "overall",
+      "antecedents": "POPPY'S PLAYHOUSE BEDROOM",
+      "consequents": "POPPY'S PLAYHOUSE LIVINGROOM",
+      "antecedent_codes": "22745",
+      "consequent_codes": "22746",
+      "support": 0.010713570522662039,
+      "confidence": 0.7070484581497798,
+      "lift": 54.882346899180575
+    },
+    "chi2_top_rule": {
+      "counts": {
+        "a_and_b": 321,
+        "a_not_b": 133,
+        "not_a_b": 65,
+        "neither": 29443
+      },
+      "expected_a_and_b": 5.848875241973166,
+      "chi2": 17467.37934376233,
+      "dof": 1,
+      "p_value": 0.0,
+      "phi": 0.7635341675811406,
+      "p_b_given_a": 0.7070484581497798,
+      "p_b_given_not_a": 0.0022027924630608647,
+      "conclusion": "Invoices with POPPY'S PLAYHOUSE BEDROOM contain POPPY'S PLAYHOUSE LIVINGROOM 71% of the time vs 0.2% without it (chi-square = 17,467, p < 0.001): the two are not independent, matching lift 54.9 > 1."
+    },
+    "hit_rate_at_5": 0.25250683682771197,
+    "popularity_hit_rate_at_5": 0.1608933454876937,
+    "n_eval_customers": 2194,
+    "recommendation_note": "score = sum of confidence x lift of fired rules (segment rules rank first); 'popular' fill items score their invoice support in the segment (else overall)",
+    "conclusion": "200 overall rules and 464 segment rules; strongest overall rule: POPPY'S PLAYHOUSE BEDROOM -> POPPY'S PLAYHOUSE LIVINGROOM (lift 54.9, confidence 71%). Top-5 recommendations caught a newly bought product for 25.3% of the 2,194 customers who bought something new in the next window, vs 16.1% for plain best sellers.",
+    "n_recommend": 5,
+    "hit_window": [
+      "2011-09-09",
+      "2011-12-08"
+    ]
+  },
+  "app_data": {
+    "timeline_rows": 24778,
+    "timeline_customers": 5278,
+    "timeline_periods": {
+      "after": 3735,
+      "before": 21043
+    },
+    "rec_reasons_rows": 15616,
+    "rule_recommendations": 15616,
+    "conclusion": "Customer timeline: 24,778 customer-months for 5,278 customers; 15,616 of 15,616 rule-based recommendations have their firing rule stored for the app.",
+    "size_kb": {
+      "timeline.parquet": 220.0,
+      "rec_reasons.parquet": 143.3
+    }
+  }
+}

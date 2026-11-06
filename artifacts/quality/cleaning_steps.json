@@ -1,0 +1,42 @@
+{
+  "raw_rows": 1067371,
+  "steps": [
+    {
+      "step": "remove_duplicates",
+      "rows_in": 1067371,
+      "rows_out": 1033036,
+      "removed": 34335,
+      "removed_to": "Duplicates"
+    },
+    {
+      "step": "split_returns",
+      "rows_in": 1033036,
+      "rows_out": 1013932,
+      "removed": 19104,
+      "removed_to": "Returns table"
+    },
+    {
+      "step": "drop_nonpositive_qty_price",
+      "rows_in": 1013932,
+      "rows_out": 1007913,
+      "removed": 6019,
+      "removed_to": "Invalid qty/price"
+    },
+    {
+      "step": "drop_missing_customer_id",
+      "rows_in": 1007913,
+      "rows_out": 779425,
+      "removed": 228488,
+      "removed_to": "Missing Customer ID"
+    },
+    {
+      "step": "impute_description",
+      "rows_in": 779425,
+      "rows_out": 779425,
+      "removed": 0,
+      "removed_to": null,
+      "imputed_sales": 0,
+      "imputed_returns": 0
+    }
+  ]
+}

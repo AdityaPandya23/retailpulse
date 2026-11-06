@@ -1,0 +1,40 @@
+{
+  "n_rows": 1007913,
+  "n_missing": 228488,
+  "share_missing": 0.2267,
+  "alpha": 0.05,
+  "tests": {
+    "mannwhitney_quantity": {
+      "median_missing": 1.0,
+      "median_present": 6.0,
+      "mean_missing": 3.025,
+      "mean_present": 13.489,
+      "U": 39214961517.5,
+      "p_value": 0.0,
+      "rank_biserial": -0.5596,
+      "effect": "large"
+    },
+    "mannwhitney_price": {
+      "median_missing": 3.36,
+      "median_present": 1.95,
+      "mean_missing": 6.993,
+      "mean_present": 3.218,
+      "U": 117185894910.5,
+      "p_value": 0.0,
+      "rank_biserial": 0.316,
+      "effect": "medium"
+    },
+    "chi2_uk": {
+      "share_uk_missing": 0.9876,
+      "share_uk_present": 0.8986,
+      "chi2": 18744.401400222392,
+      "dof": 1,
+      "p_value": 0.0,
+      "cramers_v": 0.1364,
+      "effect": "small"
+    }
+  },
+  "invoices_with_missing": 3108,
+  "share_of_those_fully_missing": 1.0,
+  "verdict": "Missingness depends on observed variables (missing vs present: median quantity 1 vs 6 (large effect); median price 3.36 vs 1.95 (medium effect); UK share 98.8% vs 89.9% (small effect)), so it is NOT MCAR. It is consistent with MAR (e.g. guest / unregistered checkouts); MNAR cannot be ruled out from the data alone. Rows without an ID cannot be attributed to a customer, so they are dropped from customer-level analysis; results therefore describe registered customers only."
+}

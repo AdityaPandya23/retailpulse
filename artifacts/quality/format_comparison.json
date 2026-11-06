@@ -1,0 +1,15 @@
+{
+  "rows": 1067371,
+  "sheets": {
+    "Year 2009-2010": 525461,
+    "Year 2010-2011": 541910
+  },
+  "date_min": "2009-12-01 07:45:00",
+  "date_max": "2011-12-09 12:50:00",
+  "xlsx_mb": 45.62,
+  "parquet_mb": 7.23,
+  "xlsx_load_s": 61.27,
+  "parquet_load_s": 0.135,
+  "size_ratio": 6.3,
+  "speedup": 455.1
+}
