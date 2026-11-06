@@ -2,7 +2,7 @@
 
 Written to artifacts/mock/ (tracked in git) so the app (P4) can be built before P3 finishes.
 Nothing comes from the real data: customer IDs start at 900001, products are "MOCK PRODUCT nn",
-segment names are placeholders (real names are chosen by the human in P3), and every metrics
+segment names are placeholders (real names come from the P3 rules or config.yaml), and every metrics
 section has "mock": true so the app can show a banner.
 """
 
@@ -33,7 +33,7 @@ from retailpulse.config import SEED
 from retailpulse.features import log1p_skewed
 
 N_CUSTOMERS = 40
-# Placeholder for the fake data only. TODO(human): the real k and segment names are chosen in
+# Placeholder for the fake data only: the real k and segment names are chosen in
 # P3 from the k-selection evidence (silhouette / elbow / DB / CH in k_selection.parquet).
 K = 4
 FIRST_ID = 900001
@@ -155,7 +155,7 @@ def _segment_tables(rng, f: pd.DataFrame) -> tuple[dict[Path, pd.DataFrame], dic
             "cramers_v": cramers_v,
             "conclusion": "MOCK: segment membership vs UK/non-UK (placeholder result).",
         },
-        "conclusion": f"MOCK: k = {K} segments (placeholder; the human chooses k and names).",
+        "conclusion": f"MOCK: k = {K} segments (placeholder; real k and names come from P3).",
     }
     tables = {
         C.SEGMENTS_PARQUET: segments,
@@ -301,7 +301,7 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
     codes = [f"MOCK{i:02d}" for i in range(1, N_PRODUCTS + 1)]
     names = [f"MOCK PRODUCT {i:02d}" for i in range(1, N_PRODUCTS + 1)]
     rows = []
-    for scope in ["all", *SEGMENT_NAMES]:
+    for scope in ["overall", *(f"segment:{n}" for n in SEGMENT_NAMES)]:
         for _ in range(3):
             a, b = rng.choice(N_PRODUCTS, 2, replace=False)
             sa, sb = rng.uniform(0.03, 0.10, 2)

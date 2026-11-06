@@ -29,7 +29,26 @@ def test_downstream_stages_declare_their_inputs():
 
 def test_stage_order():
     names = [s.name for s in STAGES]
-    assert names == ["ingest", "clean", "warehouse", "features", "stats", "cube", "eda", "mock"]
+    assert names == [
+        *("ingest", "clean", "warehouse", "features", "stats", "cube", "eda", "mock"),
+        *("segment", "predict", "rules"),
+    ]
+
+
+def test_p3_stages_cover_contracts_and_dependencies():
+    by_name = {s.name: s for s in STAGES}
+    p3_outputs = {p for n in ("segment", "predict", "rules") for p in by_name[n].outputs}
+    p3_parquets = {p for p in C.MOCKED_PARQUETS if p.parent.parent == C.ARTIFACTS_DIR} - {
+        C.FEATURES_CUTOFF_PARQUET,
+        C.LABELS_PARQUET,
+    }
+    assert p3_parquets <= p3_outputs
+    assert set(C.MODEL_JOBLIBS) <= p3_outputs
+    metrics = {m for n in ("segment", "predict", "rules") for m in by_name[n].metrics}
+    assert metrics == set(C.P3_METRICS_KEYS)
+    assert C.SEGMENTS_PARQUET in by_name["rules"].inputs  # per-segment scopes stay fresh
+    for n in ("segment", "predict", "rules"):
+        assert C.FEATURES_CUTOFF_PARQUET in by_name[n].inputs
 
 
 def test_p2_parquet_outputs_are_registered_contracts():

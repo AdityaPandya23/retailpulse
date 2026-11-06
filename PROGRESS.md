@@ -43,5 +43,27 @@
 - Labels are stored apart from features. metrics.json has one section per stage; the pipeline skips a stage only if its section exists.
 - .gitignore: `artifacts/*` instead of `artifacts/`, which silently blocked `!artifacts/mock/`. Y1/Y2 windows and alpha live in config.yaml.
 
-## Next: P3 Models
-3a segment/ ∥ 3b predict/ + baskets/ on features_cutoff + labels (log1p_skewed → StandardScaler, is_product for baskets); the human picks k and segment names.
+## P3 Models — done (2026-11-06)
+- New: segment/ (cluster, baseline, validate), predict/ (dataset, classify, regress, backtest), baskets/rules; stages segment → predict → rules; models in artifacts/models/*.joblib (raw features in); metrics.json writes are lock-protected (parallel stages).
+- Segments (7 log1p+scaled features; return_rate, non_uk_share excluded): **k = 3** by rule — all k 3–7 have every segment ≥ 3%, k = 3 has the best silhouette 0.283 and no k within 0.02 (DB 1.32, CH 2,335, subsample ARI 0.98).
+  0 **Champions** 2,086 (40% customers, 88% revenue, 65% bought again) · 1 **New Customers** 1,346 (26%, 7%, 44%) · 2 **Lost / Hibernating** 1,846 (35%, 6%, 19%).
+- Baseline RFM quartiles: K-Means separates better (silhouette 0.28 vs 0.17, DB 1.32 vs 1.92) but RFM groups predict returning slightly better (CV AUC 0.745 vs 0.718).
+  PCA: PC1–3 explain 52/21/14% (87%). Segment × UK: χ² 26, p 2e-6, Cramér's V 0.07 → significant but negligible.
+- Prediction (out-of-time): train snapshot 2011-06-11 (4,976 customers, 32.0% returned) → test at cutoff (5,278, 43.2%; Nov peak only in test).
+  CV AUC / test AUC: logistic 0.822/0.796, lda 0.818/0.793, qda 0.805/0.780, NB 0.811/0.792, **knn (k 76) 0.823/0.791** = best by train CV.
+  Paired t knn vs logistic: +0.001, p 0.46 → no real difference (logistic is slightly better on test). Threshold 0.37 (max-F1 on train OOF).
+- Backtest: we predicted 1,876 would buy again; 73% did vs base rate 43% (lift 1.68, recall 60%); top decile 90%, bottom 10%.
+- Spend regression (returners, log1p): multiple_lr best (test RMSE 0.83, R² 0.42; mean-only 1.10; £-RMSE 3,765). Expected spend = p_return × expm1(pred).
+- Rules: 200 overall + 464 segment rules (support floor 0.01, conf ≥ 0.3, lift > 1). Top: POPPY'S PLAYHOUSE BEDROOM → LIVINGROOM (lift 54.9, conf 71%, χ² 17,467, p < 0.001).
+  Recommendations (5 each for all 5,278): hit-rate@5 25.3% vs 16.1% for best sellers (2,194 customers with a new purchase).
+- Tests: 112 pass (47 new: segment 16, predict 14, baskets 12, metrics lock 4, wiring 1). Ruff clean.
+
+## P3 decisions (user delegated k + names for this phase)
+- k: smallest segment ≥ 3%, max silhouette in 3–7, ties within 0.02 → higher ARI → smaller k. Names: rule on segment z-scores (|z| > 0.5), unique.
+  **Override** in config.yaml: `segment.k: 4` and/or `segment.names: {0: "...", 1: "..."}` (ids = revenue rank), then `python -m retailpulse.pipeline` (segment + rules rerun).
+- Model selection only on train CV, never test; KNN k chosen on the same folds → its CV AUC is slightly optimistic (noted in metrics).
+- Rules scopes: "overall", "segment:<name>"; recommendation = segment rules → overall rules (Σ conf × lift) → segment best sellers; never already-bought items.
+- ROC/PR curves keep sklearn's inf end thresholds. Mock rule scopes now use the same names.
+
+## Next: P4 App
+4 Streamlit pages on the real artifacts via app/components/data.py (see PLAN.md "P4 detail").

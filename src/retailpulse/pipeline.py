@@ -2,6 +2,7 @@
 than its inputs (so `--only features` makes the next plain run refresh stats and eda).
 
 Stages: ingest -> clean -> warehouse -> features -> stats -> cube -> eda -> mock
+        -> segment -> predict (classify, regress, backtest) -> rules
 
 Usage:
     python -m retailpulse.pipeline                 # run missing stages
@@ -28,8 +29,11 @@ from retailpulse import features as features_mod
 from retailpulse import ingest as ingest_mod
 from retailpulse import mock as mock_mod
 from retailpulse import warehouse as warehouse_mod
+from retailpulse.baskets import stage as rules_stage
 from retailpulse.clean import clean
 from retailpulse.config import CONFIG_PATH, CUTOFF, HORIZON_DAYS
+from retailpulse.predict import stage as predict_stage
+from retailpulse.segment import stage as segment_stage
 from retailpulse.stats import distributions
 from retailpulse.stats import tests as stat_tests
 
@@ -183,6 +187,28 @@ STAGES: list[Stage] = [
         inputs=(C.FEATURES_FULL_PARQUET, C.SALES_PARQUET),
     ),
     Stage("mock", run_mock, C.MOCK_OUTPUTS),  # synthetic: depends only on code + seed
+    # ---- P3 models (k / names / hyper-parameters live in config.yaml) ----
+    Stage(
+        "segment",
+        segment_stage.run,
+        segment_stage.OUTPUTS,
+        segment_stage.METRICS_SECTIONS,
+        inputs=(*segment_stage.INPUTS, CONFIG_PATH),
+    ),
+    Stage(
+        "predict",
+        predict_stage.run,
+        predict_stage.OUTPUTS,
+        predict_stage.METRICS_SECTIONS,
+        inputs=(*predict_stage.INPUTS, CONFIG_PATH),
+    ),
+    Stage(
+        "rules",  # per-segment scopes: reruns whenever segments.parquet changes
+        rules_stage.run,
+        rules_stage.OUTPUTS,
+        rules_stage.METRICS_SECTIONS,
+        inputs=(*rules_stage.INPUTS, CONFIG_PATH),
+    ),
 ]
 
 

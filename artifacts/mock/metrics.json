@@ -43,7 +43,7 @@
       "cramers_v": 0.1891458064288387,
       "conclusion": "MOCK: segment membership vs UK/non-UK (placeholder result)."
     },
-    "conclusion": "MOCK: k = 4 segments (placeholder; the human chooses k and names)."
+    "conclusion": "MOCK: k = 4 segments (placeholder; real k and names come from P3)."
   },
   "classify": {
     "mock": true,
@@ -197,14 +197,14 @@
     "min_support": 0.02,
     "min_confidence": 0.3,
     "n_rules": {
-      "Mock segment A": 3,
-      "Mock segment B": 3,
-      "Mock segment C": 3,
-      "Mock segment D": 3,
-      "all": 3
+      "overall": 3,
+      "segment:Mock segment A": 3,
+      "segment:Mock segment B": 3,
+      "segment:Mock segment C": 3,
+      "segment:Mock segment D": 3
     },
     "top_rule": {
-      "scope": "Mock segment A",
+      "scope": "segment:Mock segment A",
       "antecedents": "MOCK PRODUCT 02",
       "consequents": "MOCK PRODUCT 01",
       "support": 0.02220659121089709,

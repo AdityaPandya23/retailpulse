@@ -139,3 +139,24 @@ Inputs: data/processed/sales.parquet (779,425 lines, registered customers only) 
 5. **Mock artifacts**: artifacts/mock/ (tracked in git) with tiny fake files matching every P3 contract
    (segments, predictions, rules, model metrics) so P4 can start before P3 finishes.
 6. Register stages `features`, `stats`, `cube`, `eda`, `mock` in pipeline.py; tests on the fixture.
+
+## P4 detail (updated after P3 — see PROGRESS.md)
+Real artifacts exist for every P3 contract; the app still reads only through app/components/data.py
+(paths from contracts.py, fallback artifacts/mock/). Segment ids 0..k-1 = revenue rank → fixed colours;
+k = 3 now but read k / names from metrics.json `segment` (overridable in config.yaml), never hard-code.
+
+| Page | Artifacts | metrics.json |
+|---|---|---|
+| 1 Data & Cube | quality/*.json, cube/sales_cube, eda/monthly, countries | eda, features |
+| 2 Segments & Stats | segments (pc1-3, r/f/m_score, rfm_group), profiles, k_selection (+ari_mean), pca_loadings, eda/boxplots, histograms, stats/* | segment (k_candidates, k_choice_reason, baseline, chi2_segment_uk), stats |
+| 3 Predictions | classification (split train/test), roc_curves, pr_curves, knn_bias_variance, regression | classify, regress, backtest (deciles) |
+| 4 Customer 360 | features_cutoff, labels, segments, classification (test, best model), recommendations (source rule/popular), rules | segment.segment_names |
+
+- What-if: joblib dicts in artifacts/models/ take a RAW (un-logged) DataFrame of their `features`:
+  segment_model {pipeline, features, label_to_segment, segment_names} → use segment.cluster.predict_segment;
+  classifier {pipeline, features, model, threshold} → predict_proba[:, 1]; regressor {pipeline, features, model,
+  target, note} → log1p(next_spend | returns).
+- Expected 90-day spend = p_return × expm1(regressor prediction) (spend if they return × chance they return).
+- Rules: scope "overall" or "segment:<name>"; antecedents/consequents are " + "-joined descriptions (codes in
+  *_codes). ROC first / PR last threshold is inf → drop before plotting thresholds.
+- Live test picker: reuse stats/tests.py functions on features_cutoff joined to segments.
