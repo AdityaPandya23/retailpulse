@@ -2,7 +2,7 @@
 than its inputs (so `--only features` makes the next plain run refresh stats and eda).
 
 Stages: ingest -> clean -> warehouse -> features -> stats -> cube -> eda -> mock
-        -> segment -> predict (classify, regress, backtest) -> rules
+        -> segment -> predict (classify, regress, backtest) -> rules -> app_data
 
 Usage:
     python -m retailpulse.pipeline                 # run missing stages
@@ -20,8 +20,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import joblib
 import pandas as pd
 
+from retailpulse import app_data as app_data_mod
 from retailpulse import contracts as C
 from retailpulse import cube as cube_mod
 from retailpulse import eda as eda_mod
@@ -149,8 +151,38 @@ def run_mock() -> dict:
     tables, metrics = mock_mod.build_mock()
     for path, df in tables.items():
         _write_parquet(df, C.mock_path(path), contract=path)
+    jsons = mock_mod.mock_quality_jsons()
+    for path, obj in jsons.items():
+        C.write_json(C.mock_path(path), obj)
+    models = mock_mod.build_mock_models(tables)
+    for path, payload in models.items():
+        C.mock_path(path).parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(payload, C.mock_path(path))
     C.write_json(C.mock_path(C.METRICS_JSON), metrics)
-    return {"files": len(tables) + 1}
+    return {"files": len(tables) + len(jsons) + len(models) + 1}
+
+
+APP_DATA_OUTPUTS = (C.TIMELINE_PARQUET, C.REC_REASONS_PARQUET)
+
+
+def run_app_data() -> dict:
+    sales = pd.read_parquet(
+        C.SALES_PARQUET,
+        columns=["invoice", "stock_code", "description", "invoice_date", "customer_id"]
+        + ["line_value"],
+    )
+    customers = pd.read_parquet(C.FEATURES_CUTOFF_PARQUET, columns=["customer_id"])
+    rules = pd.read_parquet(C.RULES_PARQUET)
+    recs = pd.read_parquet(C.RECOMMENDATIONS_PARQUET)
+    segments = pd.read_parquet(C.SEGMENTS_PARQUET, columns=["customer_id", "segment_name"])
+    timeline = app_data_mod.build_timeline(sales, customers["customer_id"], CUTOFF, HORIZON_DAYS)
+    reasons = app_data_mod.recommendation_reasons(sales, rules, recs, segments, CUTOFF)
+    _write_parquet(timeline, C.TIMELINE_PARQUET)
+    _write_parquet(reasons, C.REC_REASONS_PARQUET)
+    summary = app_data_mod.summarize(timeline, reasons, recs)
+    summary["size_kb"] = {p.name: round(p.stat().st_size / 1024, 1) for p in APP_DATA_OUTPUTS}
+    C.update_metrics("app_data", summary)
+    return {"rows": summary["timeline_rows"], "size_kb": summary["size_kb"]}
 
 
 _CLEANED = (C.SALES_PARQUET, C.RETURNS_PARQUET)
@@ -208,6 +240,21 @@ STAGES: list[Stage] = [
         rules_stage.OUTPUTS,
         rules_stage.METRICS_SECTIONS,
         inputs=(*rules_stage.INPUTS, CONFIG_PATH),
+    ),
+    # ---- P4: small per-customer tables for the app (timeline, rule behind each rec) ----
+    Stage(
+        "app_data",
+        run_app_data,
+        APP_DATA_OUTPUTS,
+        ("app_data",),
+        inputs=(
+            C.SALES_PARQUET,
+            C.FEATURES_CUTOFF_PARQUET,
+            C.RULES_PARQUET,
+            C.RECOMMENDATIONS_PARQUET,
+            C.SEGMENTS_PARQUET,
+            CONFIG_PATH,
+        ),
     ),
 ]
 

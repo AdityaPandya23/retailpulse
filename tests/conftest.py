@@ -15,6 +15,7 @@ cutoff) and `synthetic_shop` (seeded random customers for stats, EDA and cube te
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -158,3 +159,32 @@ def synthetic_shop() -> SimpleNamespace:
                     ret = (f"C{invoice}", codes[j], f"ITEM {j}", -1, ret_ts, float(prices[j]))
                     return_rows.append((*ret, cid, country))
     return SimpleNamespace(sales=_cleaned(sales_rows), returns=_cleaned(return_rows))
+
+
+# ---------------- P4 app: run pages on the MOCK artifacts (never the real data) ----------------
+APP_DIR = Path(__file__).resolve().parents[1] / "app"
+
+
+@pytest.fixture
+def mock_artifacts(monkeypatch):
+    """Point the app at artifacts/mock/ and make `components` importable."""
+    from retailpulse import contracts as C
+
+    if not C.all_exist(list(C.MOCK_OUTPUTS)):
+        pytest.skip("artifacts/mock/ not generated (python -m retailpulse.pipeline --only mock)")
+    monkeypatch.setenv("RETAILPULSE_ARTIFACTS", str(C.MOCK_DIR))
+    monkeypatch.syspath_prepend(str(APP_DIR))
+    return C.MOCK_DIR
+
+
+@pytest.fixture
+def run_app_page(mock_artifacts):
+    """run_app_page("pages/3_Predictions.py") -> AppTest after its first run (mock data)."""
+    from streamlit.testing.v1 import AppTest
+
+    def _run(rel_path: str, timeout: float = 120):
+        at = AppTest.from_file(str(APP_DIR / rel_path), default_timeout=timeout)
+        at.run()
+        return at
+
+    return _run

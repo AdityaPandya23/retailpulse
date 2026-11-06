@@ -31,17 +31,15 @@ def test_stage_order():
     names = [s.name for s in STAGES]
     assert names == [
         *("ingest", "clean", "warehouse", "features", "stats", "cube", "eda", "mock"),
-        *("segment", "predict", "rules"),
+        *("segment", "predict", "rules", "app_data"),
     ]
 
 
 def test_p3_stages_cover_contracts_and_dependencies():
     by_name = {s.name: s for s in STAGES}
     p3_outputs = {p for n in ("segment", "predict", "rules") for p in by_name[n].outputs}
-    p3_parquets = {p for p in C.MOCKED_PARQUETS if p.parent.parent == C.ARTIFACTS_DIR} - {
-        C.FEATURES_CUTOFF_PARQUET,
-        C.LABELS_PARQUET,
-    }
+    p3_dirs = (C.SEGMENTS_DIR, C.PREDICTIONS_DIR, C.RULES_DIR)
+    p3_parquets = {p for p in C.MOCKED_PARQUETS if p.parent in p3_dirs}
     assert p3_parquets <= p3_outputs
     assert set(C.MODEL_JOBLIBS) <= p3_outputs
     metrics = {m for n in ("segment", "predict", "rules") for m in by_name[n].metrics}
@@ -79,3 +77,15 @@ def test_update_metrics_keeps_other_sections(tmp_path):
 def test_to_jsonable_cleans_nan_and_numpy():
     out = C.to_jsonable({"a": [np.float32(0.5), float("inf")], "b": np.bool_(True)})
     assert out == {"a": [0.5, None], "b": True}
+
+
+def test_app_data_stage_wiring():
+    by_name = {s.name: s for s in STAGES}
+    st = by_name["app_data"]
+    assert set(st.outputs) == {C.TIMELINE_PARQUET, C.REC_REASONS_PARQUET}
+    for p in (C.SALES_PARQUET, C.FEATURES_CUTOFF_PARQUET, C.RULES_PARQUET, C.SEGMENTS_PARQUET):
+        assert p in st.inputs
+    assert st.metrics == ("app_data",)
+    # every file the app reads is produced by a stage (or is a P1 quality JSON / metrics)
+    produced = {p for s in STAGES for p in s.outputs}
+    assert set(C.APP_PARQUETS) | set(C.MODEL_JOBLIBS) <= produced

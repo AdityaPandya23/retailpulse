@@ -207,10 +207,319 @@
       "scope": "segment:Mock segment A",
       "antecedents": "MOCK PRODUCT 02",
       "consequents": "MOCK PRODUCT 01",
+      "antecedent_codes": "99002",
+      "consequent_codes": "99001",
       "support": 0.02220659121089709,
       "confidence": 0.47196078243887535,
       "lift": 12.781704012380121
     },
+    "hit_rate_at_5": 0.25,
+    "popularity_hit_rate_at_5": 0.15,
+    "n_eval_customers": 20,
     "conclusion": "MOCK: association rules per segment (placeholder)."
+  },
+  "features": {
+    "cutoff": "2011-09-09",
+    "horizon_days": 90,
+    "label_window": [
+      "2011-09-09",
+      "2011-12-08"
+    ],
+    "label_window_complete": false,
+    "data_end": "2011-11-25 11:00:00",
+    "n_customers_cutoff": 40,
+    "n_customers_full": 40,
+    "n_new_after_cutoff": 0,
+    "n_returned": 19,
+    "returned_rate": 0.475,
+    "mean_next_spend_returners": 470.54,
+    "median_next_spend_returners": 434.07,
+    "skewness_cutoff": {
+      "recency": 0.31,
+      "frequency": 1.09,
+      "monetary": 1.93,
+      "tenure": 0.06,
+      "avg_basket_value": 2.44,
+      "mean_interpurchase_days": 1.35,
+      "n_distinct_products": 2.15,
+      "return_rate": 1.03,
+      "non_uk_share": 1.05
+    },
+    "skewness_log1p_cutoff": {
+      "recency": -1.09,
+      "frequency": 0.25,
+      "monetary": -0.02,
+      "tenure": -0.59,
+      "avg_basket_value": 0.49,
+      "mean_interpurchase_days": -0.8,
+      "n_distinct_products": -0.29,
+      "return_rate": 0.98,
+      "non_uk_share": 1.05
+    },
+    "conclusion": "47.5% of the 40 customers who bought before 2011-09-09 bought again in the next 90 days (median spend of those who did: \u00a3434); 0 customers first appear after the cutoff and are outside the modelling set.",
+    "mock": true
+  },
+  "eda": {
+    "n_customers": 40,
+    "gini": 0.41968159443937725,
+    "top_1pct_revenue_share": 0.06838387590506956,
+    "top_10pct_revenue_share": 0.2571850319047351,
+    "top_20pct_revenue_share": 0.4721908566338706,
+    "uk_revenue_share": 0.8134715580129409,
+    "n_countries": 5,
+    "peak_month": "2011-02-01",
+    "peak_month_revenue": 4324.96,
+    "skewness_full": {
+      "recency": 0.94,
+      "frequency": 0.95,
+      "monetary": 0.94,
+      "tenure": -1.72,
+      "avg_basket_value": 0.14,
+      "mean_interpurchase_days": 1.19,
+      "n_distinct_products": -0.27,
+      "return_rate": null,
+      "non_uk_share": 1.05
+    },
+    "conclusion": "Spend is highly concentrated: the top 20% of customers bring 47% of revenue (top 1%: 7%, Gini 0.42); the UK brings 81% of revenue and the peak month is February 2011.",
+    "mock": true
+  },
+  "stats": {
+    "order_value_lognormal": {
+      "title": "Average order value per customer: lognormal vs normal",
+      "data": "features_full.avg_basket_value (GBP)",
+      "n": 40,
+      "mean": 260.3354650745088,
+      "median": 248.10750000000002,
+      "skewness": 0.13200910024304066,
+      "skewness_of_log": -1.140826625084621,
+      "fits": {
+        "lognormal": {
+          "params": {
+            "mu_log": 5.46893345164245,
+            "sigma_log": 0.46853357342938795
+          },
+          "loglik": -245.18897866045643,
+          "aic": 494.37795732091286
+        },
+        "normal": {
+          "params": {
+            "mean": 260.3354650745088,
+            "sd": 100.39462844022579
+          },
+          "loglik": -241.12188949758655,
+          "aic": 486.2437789951731
+        }
+      },
+      "best_fit": "normal",
+      "delta_aic": 8.134178325739754,
+      "conclusion": "Average order value per customer is right-skewed (median \u00a3248 vs mean \u00a3260, skewness 0.1); a normal fits slightly better than a lognormal (AIC 486 vs 494)."
+    },
+    "frequency_poisson_vs_nbinom": {
+      "title": "Repeat orders per customer: Poisson vs negative binomial",
+      "data": "features_full.frequency - 1 (orders after the first)",
+      "n": 40,
+      "mean": 4.075,
+      "variance": 14.789102564102567,
+      "dispersion_ratio": 3.629227623092654,
+      "max": 12,
+      "fits": {
+        "poisson": {
+          "params": {
+            "mu": 4.075
+          },
+          "loglik": -125.71114772843481,
+          "aic": 253.42229545686962
+        },
+        "nbinom": {
+          "params": {
+            "size_r": 1.376695319504572,
+            "prob_p": 0.2525260930447009,
+            "mu": 4.075,
+            "alpha": 0.7263771335838257
+          },
+          "loglik": -100.21937788776847,
+          "aic": 204.43875577553695
+        }
+      },
+      "best_fit": "nbinom",
+      "delta_aic": 48.98353968133267,
+      "tail_above_max_k": {
+        "k": 30,
+        "observed": 0,
+        "poisson": 7.764721009066438e-16,
+        "nbinom": 0.012278147172671542
+      },
+      "conclusion": "Repeat orders per customer (mean 4.1) are overdispersed: variance/mean = 3.6 where a Poisson needs 1, and the negative binomial fits better (AIC 204 vs 253), so customers differ strongly in how often they buy."
+    },
+    "gap_exponential": {
+      "title": "Inter-purchase gap: exponential vs Weibull",
+      "data": "days between consecutive purchase days, pooled over customers (all sales)",
+      "n_gaps": 161,
+      "mean": 103.2360248447205,
+      "median": 62.0,
+      "cv": 1.110918693700464,
+      "fits": {
+        "exponential": {
+          "params": {
+            "scale_days": 103.2360248447205,
+            "rate_per_day": 0.009686541122676131
+          },
+          "loglik": -907.5598770839501,
+          "aic": 1817.1197541679003
+        },
+        "weibull": {
+          "params": {
+            "shape": 0.9782420422988536,
+            "scale_days": 102.1784201165815
+          },
+          "loglik": -907.4904243759003,
+          "aic": 1818.9808487518005
+        }
+      },
+      "best_fit": "exponential",
+      "delta_aic": 1.8610945839002397,
+      "conclusion": "Days between a customer's purchase days (median 62, mean 103, coefficient of variation 1.11; an exponential has 1) are well described by an exponential (AIC 1,817 vs Weibull 1,819): the chance of buying again does not depend on the time since the last purchase."
+    },
+    "basket_repeat_vs_onetime": {
+      "title": "Average basket value: repeat vs one-time customers (Welch t vs Mann-Whitney U)",
+      "data": "features_full (repeat = 2+ invoices)",
+      "groups": {
+        "repeat customers": {
+          "n": 35,
+          "mean": 267.52996008515294,
+          "median": 248.155,
+          "sd": 92.15738626963888
+        },
+        "one-time customers": {
+          "n": 5,
+          "mean": 209.974,
+          "median": 126.25,
+          "sd": 158.04176166444108
+        }
+      },
+      "alpha": 0.05,
+      "welch_t": {
+        "t": 0.7952497856393065,
+        "df": 4.396822939267887,
+        "p_value": 0.4672018991526944,
+        "cohens_d": 0.569103759176602,
+        "effect": "medium"
+      },
+      "mann_whitney": {
+        "U": 114.0,
+        "p_value": 0.2975161396214028,
+        "rank_biserial": 0.30285714285714294,
+        "effect": "medium"
+      },
+      "tests_agree": true,
+      "conclusion": "No significant difference in average basket value between repeat customers and one-time customers (median \u00a3248 vs \u00a3126; Mann-Whitney p = 0.298); Welch's t-test on the means (\u00a3268 vs \u00a3210, p = 0.467, d = +0.57) agrees."
+    },
+    "paired_spend_y1_y2": {
+      "title": "Same customers' spend, year 1 vs year 2 (paired t-test)",
+      "data": "sales of customers with purchases in both years",
+      "year1": [
+        "2009-12-01",
+        "2010-11-30"
+      ],
+      "year2": [
+        "2010-12-01",
+        "2011-11-30"
+      ],
+      "n_customers": 29,
+      "n_year1_only": 9,
+      "n_year2_only": 2,
+      "alpha": 0.05,
+      "mean_year1": 872.8741379310345,
+      "mean_year2": 722.8358620689654,
+      "median_year1": 699.43,
+      "median_year2": 721.84,
+      "mean_change": -150.03827586206893,
+      "median_change": -89.18999999999994,
+      "share_increased": 0.4482758620689655,
+      "paired_t": {
+        "t": -1.4148374020185692,
+        "df": 28,
+        "p_value": 0.16814169965816642,
+        "cohens_dz": -0.2627287098333797,
+        "effect": "small"
+      },
+      "wilcoxon": {
+        "W": 155.0,
+        "p_value": 0.18283364921808243
+      },
+      "tests_agree": true,
+      "conclusion": "No significant change in mean spend for the 29 customers active in both years (\u00a3873 -> \u00a3723, -\u00a3150; paired t p = 0.168); the Wilcoxon signed-rank test (median change -\u00a389, 45% spent more, p = 0.183) agrees."
+    },
+    "correlation": {
+      "title": "Customer features: Pearson vs Spearman correlation, covariance",
+      "data": "features_full",
+      "n": 40,
+      "features": [
+        "recency",
+        "frequency",
+        "monetary",
+        "tenure",
+        "avg_basket_value",
+        "mean_interpurchase_days",
+        "n_distinct_products",
+        "return_rate",
+        "non_uk_share"
+      ],
+      "strongest_spearman": {
+        "x": "frequency",
+        "y": "n_distinct_products",
+        "pearson": 0.8509848177507495,
+        "spearman": 0.9328997743181501,
+        "gap": 0.08191495656740055
+      },
+      "largest_pearson_spearman_gaps": [
+        {
+          "x": "recency",
+          "y": "tenure",
+          "pearson": -0.2772,
+          "spearman": -0.4697,
+          "gap": -0.1925
+        },
+        {
+          "x": "mean_interpurchase_days",
+          "y": "non_uk_share",
+          "pearson": 0.0426,
+          "spearman": 0.1576,
+          "gap": 0.115
+        },
+        {
+          "x": "frequency",
+          "y": "tenure",
+          "pearson": 0.5524,
+          "spearman": 0.6629,
+          "gap": 0.1105
+        }
+      ],
+      "variances": {
+        "recency": 35824.050641025635,
+        "frequency": 14.78910256410256,
+        "monetary": 1018532.065629487,
+        "tenure": 13005.833333333332,
+        "avg_basket_value": 10337.519404770252,
+        "mean_interpurchase_days": 33346.26828386632,
+        "n_distinct_products": 12.701923076923077,
+        "return_rate": 0.0,
+        "non_uk_share": 0.20448717948717934
+      },
+      "conclusion": "Strongest monotonic link: frequency-n_distinct_products (Spearman \u03c1 = 0.93, Pearson r = 0.85); the two disagree most on recency-tenure (r = -0.28 vs \u03c1 = -0.47) because a few extreme customers dominate Pearson, and covariances depend on units (monetary in \u00a3\u00b2), so models use log1p + standardised features."
+    },
+    "mock": true
+  },
+  "app_data": {
+    "timeline_rows": 181,
+    "timeline_customers": 40,
+    "timeline_periods": {
+      "after": 19,
+      "before": 162
+    },
+    "rec_reasons_rows": 40,
+    "rule_recommendations": 40,
+    "conclusion": "Customer timeline: 181 customer-months for 40 customers; 40 of 40 rule-based recommendations have their firing rule stored for the app.",
+    "mock": true
   }
 }

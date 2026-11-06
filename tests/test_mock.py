@@ -17,7 +17,7 @@ def test_mock_matches_every_contract(mock):
     assert set(tables) == set(C.MOCKED_PARQUETS)
     for path, df in tables.items():
         C.validate(df, path)
-        assert 0 < len(df) <= 1000, path.name  # tiny: tracked in git
+        assert 0 < len(df) <= 2000, path.name  # tiny: tracked in git
     for section, keys in C.P3_METRICS_KEYS.items():
         assert set(keys) <= set(metrics[section]) and metrics[section]["mock"] is True
     json.dumps(C.to_jsonable(metrics), allow_nan=False)
@@ -32,9 +32,12 @@ def test_mock_is_self_consistent(mock):
         C.SEGMENTS_PARQUET,
         C.CLASSIFICATION_PARQUET,
         C.REGRESSION_PARQUET,
-        C.RECOMMENDATIONS_PARQUET,
     ):
         assert set(tables[path]["customer_id"]) == ids, path.name
+    # customers who already bought every mock product get no recommendation
+    assert set(tables[C.RECOMMENDATIONS_PARQUET]["customer_id"]) <= ids
+    assert set(tables[C.TIMELINE_PARQUET]["customer_id"]) == ids
+    assert not tables[C.REC_REASONS_PARQUET].empty  # some "rule" recs have a fired rule
     assert set(tables[C.CLASSIFICATION_PARQUET]["model"]) == set(C.CLASSIFIERS)
     assert set(tables[C.REGRESSION_PARQUET]["model"]) == set(C.REGRESSORS)
     profiles = tables[C.SEGMENT_PROFILES_PARQUET]

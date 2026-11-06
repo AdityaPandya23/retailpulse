@@ -1,0 +1,41 @@
+{
+  "mock": true,
+  "n_rows": 950,
+  "n_missing": 220,
+  "share_missing": 0.23,
+  "alpha": 0.05,
+  "tests": {
+    "mannwhitney_quantity": {
+      "median_missing": 1.0,
+      "median_present": 6.0,
+      "mean_missing": 3.0,
+      "mean_present": 11.0,
+      "U": 1000.0,
+      "p_value": 1e-06,
+      "rank_biserial": -0.5,
+      "effect": "large"
+    },
+    "mannwhitney_price": {
+      "median_missing": 1.0,
+      "median_present": 6.0,
+      "mean_missing": 3.0,
+      "mean_present": 11.0,
+      "U": 1000.0,
+      "p_value": 1e-06,
+      "rank_biserial": 0.3,
+      "effect": "medium"
+    },
+    "chi2_uk": {
+      "share_uk_missing": 0.99,
+      "share_uk_present": 0.9,
+      "chi2": 50.0,
+      "dof": 1,
+      "p_value": 1e-06,
+      "cramers_v": 0.14,
+      "effect": "small"
+    }
+  },
+  "invoices_with_missing": 30,
+  "share_of_those_fully_missing": 1.0,
+  "verdict": "MOCK: not MCAR; consistent with MAR (placeholder)."
+}

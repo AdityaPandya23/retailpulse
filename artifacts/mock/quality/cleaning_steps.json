@@ -1,0 +1,41 @@
+{
+  "mock": true,
+  "raw_rows": 1000,
+  "steps": [
+    {
+      "step": "remove exact duplicates",
+      "rows_in": 1000,
+      "rows_out": 970,
+      "removed": 30,
+      "removed_to": "dropped"
+    },
+    {
+      "step": "split returns (invoice starts with C)",
+      "rows_in": 970,
+      "rows_out": 950,
+      "removed": 20,
+      "removed_to": "returns table"
+    },
+    {
+      "step": "drop quantity <= 0 or price <= 0",
+      "rows_in": 950,
+      "rows_out": 940,
+      "removed": 10,
+      "removed_to": "dropped"
+    },
+    {
+      "step": "drop missing customer id",
+      "rows_in": 940,
+      "rows_out": 720,
+      "removed": 220,
+      "removed_to": "dropped (guest checkouts)"
+    },
+    {
+      "step": "impute missing description",
+      "rows_in": 720,
+      "rows_out": 720,
+      "removed": 0,
+      "removed_to": "imputed"
+    }
+  ]
+}

@@ -192,6 +192,21 @@ RECOMMENDATIONS_PARQUET = RULES_DIR / "recommendations.parquet"
 RULES_COLUMNS = ["scope", "antecedents", "consequents", "support", "confidence", "lift"]
 RECOMMENDATIONS_COLUMNS = ["customer_id", "rank", "stock_code", "description", "score"]
 
+# ======================= P4: app data (the deployed app never reads data/) =======================
+CUSTOMERS_DIR = ARTIFACTS_DIR / "customers"
+TIMELINE_PARQUET = CUSTOMERS_DIR / "timeline.parquet"  # customer x month x period
+REC_REASONS_PARQUET = CUSTOMERS_DIR / "rec_reasons.parquet"  # rule behind each "rule" rec
+TIMELINE_COLUMNS = ["customer_id", "month", "revenue", "orders", "period"]  # before | after
+REC_REASONS_COLUMNS = [
+    "customer_id",
+    "stock_code",
+    "scope",
+    "antecedents",
+    "consequents",
+    "confidence",
+    "lift",
+]
+
 # metrics.json sections written by P3, with the keys the app relies on
 P3_METRICS_KEYS: dict[str, list[str]] = {
     "segment": [
@@ -245,6 +260,8 @@ PARQUET_CONTRACTS: dict[Path, list[str]] = {
     REGRESSION_PARQUET: REGRESSION_COLUMNS,
     RULES_PARQUET: RULES_COLUMNS,
     RECOMMENDATIONS_PARQUET: RECOMMENDATIONS_COLUMNS,
+    TIMELINE_PARQUET: TIMELINE_COLUMNS,
+    REC_REASONS_PARQUET: REC_REASONS_COLUMNS,
 }
 EDA_OUTPUTS = (
     EDA_HISTOGRAMS_PARQUET,
@@ -272,7 +289,28 @@ MOCKED_PARQUETS = (
     REGRESSION_PARQUET,
     RULES_PARQUET,
     RECOMMENDATIONS_PARQUET,
+    # P4: everything else the app reads, so the whole app runs on mock data (tests, CI)
+    TIMELINE_PARQUET,
+    REC_REASONS_PARQUET,
+    CUBE_PARQUET,
+    *EDA_OUTPUTS,
+    QQ_PARQUET,
+    FREQUENCY_FIT_PARQUET,
+    CORRELATION_PARQUET,
 )
+QUALITY_JSONS = (
+    FORMAT_COMPARISON_JSON,
+    CLEANING_STEPS_JSON,
+    MISSING_ID_JSON,
+    WAREHOUSE_SUMMARY_JSON,
+)
+
+# ---- what the app reads (P5 deploy: track exactly these) ----
+APP_PARQUETS = tuple(p for p in MOCKED_PARQUETS)
+APP_JSONS = (*QUALITY_JSONS, METRICS_JSON)
+APP_FILES = (*APP_PARQUETS, *APP_JSONS, *MODEL_JOBLIBS)
+# metrics.json sections the app reads
+APP_METRICS_SECTIONS = ("features", "stats", "eda", *P3_METRICS_KEYS, "app_data")
 
 
 def mock_path(path: Path, mock_dir: Path = MOCK_DIR) -> Path:
@@ -280,7 +318,12 @@ def mock_path(path: Path, mock_dir: Path = MOCK_DIR) -> Path:
     return Path(mock_dir) / Path(path).relative_to(ARTIFACTS_DIR)
 
 
-MOCK_OUTPUTS = (*(mock_path(p) for p in MOCKED_PARQUETS), mock_path(METRICS_JSON))
+MOCK_OUTPUTS = (
+    *(mock_path(p) for p in MOCKED_PARQUETS),
+    *(mock_path(p) for p in QUALITY_JSONS),
+    *(mock_path(p) for p in MODEL_JOBLIBS),
+    mock_path(METRICS_JSON),
+)
 
 
 class ContractError(ValueError):

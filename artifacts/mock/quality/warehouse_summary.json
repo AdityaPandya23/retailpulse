@@ -1,0 +1,36 @@
+{
+  "mock": true,
+  "row_counts": {
+    "fact_sales": 720,
+    "fact_returns": 20,
+    "dim_customer": 40,
+    "dim_product": 12,
+    "dim_date": 739,
+    "dim_country": 5
+  },
+  "total_revenue": 50000.0,
+  "returns_value": -2000.0,
+  "revenue_by_year": [
+    {
+      "year": 2009,
+      "revenue": 2000.0,
+      "invoices": 10
+    },
+    {
+      "year": 2010,
+      "revenue": 24000.0,
+      "invoices": 120
+    },
+    {
+      "year": 2011,
+      "revenue": 24000.0,
+      "invoices": 120
+    }
+  ],
+  "top_countries": [
+    {
+      "country": "United Kingdom",
+      "revenue": 40000.0
+    }
+  ]
+}

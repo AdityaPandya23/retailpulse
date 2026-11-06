@@ -29,7 +29,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from retailpulse import contracts as C
-from retailpulse.config import SEED
+from retailpulse.config import CUTOFF, HORIZON_DAYS, SEED
 from retailpulse.features import log1p_skewed
 
 N_CUSTOMERS = 40
@@ -39,6 +39,11 @@ K = 4
 FIRST_ID = 900001
 SEGMENT_NAMES = [f"Mock segment {c}" for c in "ABCD"]
 N_PRODUCTS = 12
+
+
+def mock_codes() -> list[str]:
+    """5-digit stock codes so features.is_product / baskets treat them as products."""
+    return [f"{99000 + i}" for i in range(1, N_PRODUCTS + 1)]
 
 
 def _z(x) -> np.ndarray:
@@ -298,7 +303,7 @@ def _prediction_tables(rng, f: pd.DataFrame, lab: pd.DataFrame) -> tuple[dict, d
 
 
 def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
-    codes = [f"MOCK{i:02d}" for i in range(1, N_PRODUCTS + 1)]
+    codes = mock_codes()
     names = [f"MOCK PRODUCT {i:02d}" for i in range(1, N_PRODUCTS + 1)]
     rows = []
     for scope in ["overall", *(f"segment:{n}" for n in SEGMENT_NAMES)]:
@@ -311,6 +316,8 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
                     "scope": scope,
                     "antecedents": names[a],
                     "consequents": names[b],
+                    "antecedent_codes": codes[a],
+                    "consequent_codes": codes[b],
                     "support": sab,
                     "confidence": sab / sa,
                     "lift": sab / (sa * sb),
@@ -329,6 +336,7 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
                     "stock_code": codes[j],
                     "description": names[j],
                     "score": float(s),
+                    "source": "rule" if rank <= 2 else "popular",
                 }
             )
     top = rules.loc[rules["lift"].idxmax()]
@@ -338,6 +346,9 @@ def _rule_tables(rng, f: pd.DataFrame) -> tuple[dict, dict]:
         "min_confidence": 0.3,
         "n_rules": rules.groupby("scope").size().to_dict(),
         "top_rule": top.to_dict(),
+        "hit_rate_at_5": 0.25,
+        "popularity_hit_rate_at_5": 0.15,
+        "n_eval_customers": 20,
         "conclusion": "MOCK: association rules per segment (placeholder).",
     }
     tables = {C.RULES_PARQUET: rules, C.RECOMMENDATIONS_PARQUET: pd.DataFrame(rec_rows)}
@@ -352,14 +363,16 @@ def build_mock(seed: int = SEED, n: int = N_CUSTOMERS) -> tuple[dict[Path, pd.Da
     seg_tables, seg_metrics = _segment_tables(rng, f)
     pred_tables, pred_metrics = _prediction_tables(rng, f, lab)
     rule_tables, rule_metrics = _rule_tables(rng, f)
+    app_tables, app_metrics = _app_tables(rng, f, lab, seg_tables, rule_tables)
     tables = {
         C.FEATURES_CUTOFF_PARQUET: f,
         C.LABELS_PARQUET: lab,
         **seg_tables,
         **pred_tables,
         **rule_tables,
+        **app_tables,
     }
-    metrics = {"segment": seg_metrics, **pred_metrics, "rules": rule_metrics}
+    metrics = {"segment": seg_metrics, **pred_metrics, "rules": rule_metrics, **app_metrics}
     if set(tables) != set(C.MOCKED_PARQUETS):
         raise C.ContractError("mock tables do not match contracts.MOCKED_PARQUETS")
     for path, df in tables.items():
@@ -369,3 +382,231 @@ def build_mock(seed: int = SEED, n: int = N_CUSTOMERS) -> tuple[dict[Path, pd.Da
         if missing:
             raise C.ContractError(f"mock metrics[{section}] is missing keys: {missing}")
     return tables, metrics
+
+
+# ======================= P4: everything else the app reads =======================
+MOCK_COUNTRIES = ["France", "Germany", "Netherlands", "EIRE"]
+DATA_START = pd.Timestamp("2009-12-01")
+
+
+def mock_sales(rng: np.random.Generator, f: pd.DataFrame, lab: pd.DataFrame) -> pd.DataFrame:
+    """Cleaned-schema sales lines for the mock customers (MOCK products, 2009-12 -> 2011-12).
+
+    Every customer buys at least once before the cutoff; returners (labels) also buy in the
+    label window, so the mock timeline agrees with the mock labels.
+    """
+    codes = mock_codes()
+    names = dict(
+        zip(codes, [f"MOCK PRODUCT {i:02d}" for i in range(1, N_PRODUCTS + 1)], strict=True)
+    )
+    before_days = (CUTOFF - DATA_START).days
+    rows, inv = [], 500000
+    returned = dict(
+        zip(f["customer_id"].astype(int), lab["returned_flag"].astype(int), strict=True)
+    )
+    for cid, freq, non_uk in zip(f["customer_id"], f["frequency"], f["non_uk_share"], strict=True):
+        country = "United Kingdom" if non_uk < 0.5 else str(rng.choice(MOCK_COUNTRIES))
+        days = rng.integers(0, before_days, int(min(freq, 12)))
+        dates = [DATA_START + pd.Timedelta(days=int(d), hours=10) for d in days]
+        if returned[int(cid)]:
+            dates.append(CUTOFF + pd.Timedelta(days=int(rng.integers(0, HORIZON_DAYS)), hours=11))
+        for date in dates:
+            inv += 1
+            for code in rng.choice(codes, int(rng.integers(1, 5)), replace=False):
+                qty = int(rng.integers(1, 25))
+                price = float(np.round(rng.uniform(0.5, 15.0), 2))
+                rows.append((str(inv), str(code), names[code], qty, date, price, int(cid), country))
+    sales = pd.DataFrame(rows, columns=C.RAW_COLUMNS)
+    sales["invoice_date"] = pd.to_datetime(sales["invoice_date"]).astype("datetime64[ns]")
+    sales["line_value"] = np.round(sales["quantity"] * sales["price"], 2)
+    return sales.sort_values(["invoice_date", "invoice"]).reset_index(drop=True)
+
+
+def mock_cube(sales: pd.DataFrame) -> pd.DataFrame:
+    import duckdb
+
+    from retailpulse.cube import build_cube
+
+    con = duckdb.connect()
+    try:
+        con.register("mock_sales", sales)
+        con.execute(
+            "CREATE VIEW fact_sales AS SELECT *, year(invoice_date) AS year, "
+            "month(invoice_date) AS month FROM mock_sales"
+        )
+        return build_cube(con)
+    finally:
+        con.close()
+
+
+def _app_tables(rng, f, lab, seg_tables, rule_tables) -> tuple[dict, dict]:
+    """Timeline, rec reasons, cube, EDA and stats tables (+ their metrics) on mock sales."""
+    from retailpulse import app_data, eda
+    from retailpulse import features as features_mod
+    from retailpulse.baskets import rules as R
+    from retailpulse.stats import distributions
+    from retailpulse.stats import tests as stat_tests
+
+    sales = mock_sales(rng, f, lab)
+    full = features_mod.build_features(sales, sales.iloc[0:0], features_mod.full_cutoff(sales))
+    timeline = app_data.build_timeline(sales, f["customer_id"])
+    # recommendations from the real recommender on the mock sales + mock rules, so "rule"
+    # recommendations have a rule that fired (overrides the random ones of _rule_tables)
+    segments = seg_tables[C.SEGMENTS_PARQUET]
+    recs = R.recommend_all(
+        R.product_lines(sales, end=CUTOFF), rule_tables[C.RULES_PARQUET], f["customer_id"], segments
+    )
+    reasons = app_data.recommendation_reasons(sales, rule_tables[C.RULES_PARQUET], recs, segments)
+    eda_tables, eda_summary = eda.run(full, sales)
+    dist_entries, qq, freq_table = distributions.run(full, sales)
+    test_entries, corr = stat_tests.run(full, sales)
+    feats_summary = features_mod.summarize(
+        f, lab, full, CUTOFF, HORIZON_DAYS, sales["invoice_date"].max()
+    )
+    tables = {
+        C.RECOMMENDATIONS_PARQUET: recs,
+        C.TIMELINE_PARQUET: timeline,
+        C.REC_REASONS_PARQUET: reasons,
+        C.CUBE_PARQUET: mock_cube(sales),
+        **eda_tables,
+        C.QQ_PARQUET: qq,
+        C.FREQUENCY_FIT_PARQUET: freq_table,
+        C.CORRELATION_PARQUET: corr,
+    }
+    app_summary = app_data.summarize(timeline, reasons, recs)
+    metrics = {
+        "features": {**feats_summary, "mock": True},
+        "eda": {**eda_summary, "mock": True},
+        "stats": {**dist_entries, **test_entries, "mock": True},
+        "app_data": {**app_summary, "mock": True},
+    }
+    return tables, metrics
+
+
+def mock_quality_jsons() -> dict[Path, dict]:
+    """P1 quality JSONs with the real structure and made-up numbers ("mock": true)."""
+    steps = [
+        ("remove exact duplicates", 1000, 970, "dropped"),
+        ("split returns (invoice starts with C)", 970, 950, "returns table"),
+        ("drop quantity <= 0 or price <= 0", 950, 940, "dropped"),
+        ("drop missing customer id", 940, 720, "dropped (guest checkouts)"),
+        ("impute missing description", 720, 720, "imputed"),
+    ]
+    mw = {
+        "median_missing": 1.0,
+        "median_present": 6.0,
+        "mean_missing": 3.0,
+        "mean_present": 11.0,
+        "U": 1000.0,
+        "p_value": 1e-6,
+        "rank_biserial": -0.5,
+        "effect": "large",
+    }
+    return {
+        C.FORMAT_COMPARISON_JSON: {
+            "mock": True,
+            "rows": 1000,
+            "sheets": {"Year 2009-2010": 480, "Year 2010-2011": 520},
+            "date_min": "2009-12-01 07:45:00",
+            "date_max": "2011-12-09 12:50:00",
+            "xlsx_mb": 45.0,
+            "parquet_mb": 7.0,
+            "xlsx_load_s": 55.0,
+            "parquet_load_s": 0.15,
+            "size_ratio": 6.4,
+            "speedup": 366.0,
+        },
+        C.CLEANING_STEPS_JSON: {
+            "mock": True,
+            "raw_rows": 1000,
+            "steps": [
+                {"step": s, "rows_in": a, "rows_out": b, "removed": a - b, "removed_to": t}
+                for s, a, b, t in steps
+            ],
+        },
+        C.MISSING_ID_JSON: {
+            "mock": True,
+            "n_rows": 950,
+            "n_missing": 220,
+            "share_missing": 0.23,
+            "alpha": 0.05,
+            "tests": {
+                "mannwhitney_quantity": mw,
+                "mannwhitney_price": {**mw, "rank_biserial": 0.3, "effect": "medium"},
+                "chi2_uk": {
+                    "share_uk_missing": 0.99,
+                    "share_uk_present": 0.9,
+                    "chi2": 50.0,
+                    "dof": 1,
+                    "p_value": 1e-6,
+                    "cramers_v": 0.14,
+                    "effect": "small",
+                },
+            },
+            "invoices_with_missing": 30,
+            "share_of_those_fully_missing": 1.0,
+            "verdict": "MOCK: not MCAR; consistent with MAR (placeholder).",
+        },
+        C.WAREHOUSE_SUMMARY_JSON: {
+            "mock": True,
+            "row_counts": {
+                "fact_sales": 720,
+                "fact_returns": 20,
+                "dim_customer": N_CUSTOMERS,
+                "dim_product": N_PRODUCTS,
+                "dim_date": 739,
+                "dim_country": 5,
+            },
+            "total_revenue": 50000.0,
+            "returns_value": -2000.0,
+            "revenue_by_year": [
+                {"year": 2009, "revenue": 2000.0, "invoices": 10},
+                {"year": 2010, "revenue": 24000.0, "invoices": 120},
+                {"year": 2011, "revenue": 24000.0, "invoices": 120},
+            ],
+            "top_countries": [{"country": "United Kingdom", "revenue": 40000.0}],
+        },
+    }
+
+
+def build_mock_models(tables: dict[Path, pd.DataFrame]) -> dict[Path, dict]:
+    """Tiny fitted models with the real joblib payload layout (raw features in)."""
+    from retailpulse.predict.classify import make_classifier
+    from retailpulse.predict.dataset import FEATURES
+    from retailpulse.predict.regress import EXPECTED_SPEND_NOTE, TARGET_NAME, make_regressor
+    from retailpulse.segment.cluster import segment_pipeline
+
+    f = tables[C.FEATURES_CUTOFF_PARQUET]
+    lab = tables[C.LABELS_PARQUET]
+    seg = tables[C.SEGMENTS_PARQUET]
+    # same preprocessing + KMeans settings as _segment_tables -> the same labels (= segment ids)
+    seg_pipe = segment_pipeline(C.FEATURE_COLUMNS, K, SEED).fit(f[C.FEATURE_COLUMNS])
+    names = dict(zip(seg["segment"].astype(int), seg["segment_name"].astype(str), strict=True))
+    df = f.merge(lab, on="customer_id")
+    clf = make_classifier("logistic").fit(df[FEATURES], df["returned_flag"])
+    ret = df[df["next_spend"] > 0]
+    reg = make_regressor("multiple_lr").fit(ret[FEATURES], np.log1p(ret["next_spend"]))
+    return {
+        C.SEGMENT_MODEL_JOBLIB: {
+            "pipeline": seg_pipe,
+            "features": list(C.FEATURE_COLUMNS),
+            "label_to_segment": {k: k for k in range(K)},
+            "segment_names": {k: names.get(k, SEGMENT_NAMES[k]) for k in range(K)},
+            "mock": True,
+        },
+        C.CLASSIFIER_JOBLIB: {
+            "pipeline": clf,
+            "features": list(FEATURES),
+            "model": "logistic",
+            "threshold": 0.5,
+            "mock": True,
+        },
+        C.REGRESSOR_JOBLIB: {
+            "pipeline": reg,
+            "features": list(FEATURES),
+            "model": "multiple_lr",
+            "target": TARGET_NAME,
+            "note": EXPECTED_SPEND_NOTE,
+            "mock": True,
+        },
+    }

@@ -1,0 +1,16 @@
+{
+  "mock": true,
+  "rows": 1000,
+  "sheets": {
+    "Year 2009-2010": 480,
+    "Year 2010-2011": 520
+  },
+  "date_min": "2009-12-01 07:45:00",
+  "date_max": "2011-12-09 12:50:00",
+  "xlsx_mb": 45.0,
+  "parquet_mb": 7.0,
+  "xlsx_load_s": 55.0,
+  "parquet_load_s": 0.15,
+  "size_ratio": 6.4,
+  "speedup": 366.0
+}
