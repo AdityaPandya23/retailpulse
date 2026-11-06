@@ -100,13 +100,20 @@ visual data mining · data acquisition, formats, imputation, split-apply-combine
 warehousing, OLAP, cubes.
 
 ## Build phases (one day)
-| Phase | Scope | Depends on |
-|---|---|---|
-| P1 Setup + Data | scaffold, venv, git, ingest, clean, missing-ID analysis, warehouse | — |
-| P2 Features + Stats | features, labels, contracts, stats tests, EDA figures, cube, mock artifacts | P1 |
-| P3 Models | 3a segment/ · 3b predict/ + baskets/ (parallel OK) | P2 |
-| P4 App | 4 pages on real artifacts | P3 |
-| P5 Polish + Ship | review, demo fixes, deploy, DEMO_SCRIPT.md | P4 |
+| Phase | Scope | Depends on | Status |
+|---|---|---|---|
+| P1 Setup + Data | scaffold, venv, git, ingest, clean, missing-ID analysis, warehouse | — | done |
+| P2 Features + Stats | features, labels, contracts, stats tests, EDA figures, cube, mock artifacts | P1 | done |
+| P3 Models | 3a segment/ · 3b predict/ + baskets/ (parallel OK) | P2 | done |
+| P4 App | 4 pages on real artifacts | P3 | done |
+| P5 Polish + Ship | review, demo fixes, deploy prep, DEMO_SCRIPT.md | P4 | done (cloud deploy click = human) |
+
+## Remaining human TODOs (after P5)
+1. Confirm or override k and segment names: `segment.k` / `segment.names` in config.yaml (evidence on app page 2),
+   then `python -m retailpulse.pipeline` and commit the changed artifacts (`git status` lists them).
+2. Deploy on share.streamlit.io: repo AdityaPandya23/retailpulse, branch main, main file app/Home.py,
+   Python 3.12 (Advanced settings); paste the URL into README.md ("Live demo").
+3. Open the live app, confirm there is no "Mock data" badge, rehearse DEMO_SCRIPT.md once.
 
 ## P2 detail (updated after P1 — see PROGRESS.md)
 Already done in P1, do NOT redo: contracts.py (extend it), pipeline Stage pattern (register new stages),
@@ -176,4 +183,4 @@ k = 3 now but read k / names from metrics.json `segment` (overridable in config.
    → B: Page 3 (Time Machine: predict, then reveal 73% vs 43%; models tied; KNN slider) → C: Page 4 (customer
    15288: timeline, gauge vs actual, recs + fired rule, what-if) → close on limitations (registered customers
    only, one cutoff, Nov peak only in test, expected spend is a typical-customer estimate).
-4. Human TODO: confirm or override k and segment names (config.yaml segment.k / segment.names) before the demo.
+4. Human TODO: see "Remaining human TODOs" above.

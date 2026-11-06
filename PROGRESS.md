@@ -90,5 +90,28 @@
   member (15288). What-if baseline = live models on the real features (delta starts at 0).
 - Two subagents built pages 1–2 / 3–4 in parallel after the shared foundation; I integrated and reviewed.
 
-## Next: P5 Polish + Ship
-Review, browser walk-through, deploy to Streamlit Community Cloud, DEMO_SCRIPT.md (see PLAN.md "P5 detail").
+## P5 Polish + Ship — done (2026-11-06)
+- Review (62b44db): checklist + /code-review high of f26540e..HEAD. Rules held (single reader, no hard-coded k /
+  names / model, seed 42); Time Machine = metrics.backtest exactly (1,876 / 73% / lift 1.68), train thresholds,
+  cube grouping_id + no customer sums, live models reproduce test predictions. Fixed 5 (each + regression test):
+  What-if sliders reset to their minimum after a page switch; sunburst parents now summed from children (penny
+  rounding could blank the chart); mock stage reruns on config.yaml; null metrics show "n/a" (was a crash);
+  horizon labels from config. Skipped 5 (helper duplication, micro-perf: renders already 0.7–2 s).
+- Visual (104aa13): no browser tool → every figure rendered on real data via AppTest capture + kaleido (scratch
+  only) at 1280 / 1920 px widths. Fixed label collisions (missing-ID, Pareto, biplot), crowded log ticks, clipped
+  3D PCA title, squeezed parallel plot, legends over data (hist, ROC, PR), timeline legend order. Tour 1..n ok.
+- Deploy (d5548d3): requirements.txt exact pins + `-e .` (plain `.` would move config.ROOT into site-packages);
+  .gitignore block generated from contracts.APP_FILES (`python -m retailpulse.deploy`); 33 app artifacts
+  tracked = 3.13 MB (+ mock 0.17 MB); tests/test_deploy.py guards it; CI = GitHub Actions (ruff + pytest, 3.12).
+- Clean clone (scratch venv, no data/): mock_files() == [], 3 models load, Home + 4 pages no exception, headless
+  /_stcore/health ok, ruff + 238 tests (+23) pass; local pipeline rerun skips every stage.
+- Docs: README.md (A/B/C numbers, run, layout, credit, limits); DEMO_SCRIPT.md (~8 min, tour order, live numbers, Q&A).
+
+## P5 decisions
+- Pins = the .venv versions (sklearn 1.9.1, numpy 2.5.4 also pinned: pickled models); change only with a rerun.
+- Customer timeline keeps its log axis (PLAN rule "log where skewed"); demo avoids extreme single-slider what-ifs.
+
+## Open items (human)
+1. Confirm / override `segment.k` and `segment.names` in config.yaml → `python -m retailpulse.pipeline` → commit artifacts.
+2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
+3. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once.
