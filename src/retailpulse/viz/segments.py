@@ -164,11 +164,20 @@ def pca_scatter_3d(
             "yaxis": {"title": {"text": _pct_axis(explained, 1)}},
             "zaxis": {"title": {"text": _pct_axis(explained, 2)}},
         },
-        margin={"l": 0, "r": 0, "t": 60, "b": 0},
-        legend={"itemsizing": "constant"},
+        margin={"l": 0, "r": 0, "t": 90, "b": 0},
+        # horizontal legend under the title: on the right it squeezed the scene in a
+        # ~480 px column and the axes were cropped
+        legend={
+            "itemsizing": "constant",
+            "orientation": "h",
+            "x": 0,
+            "y": 1.0,
+            "yanchor": "bottom",
+            "title": {"text": ""},
+        },
         # camera a bit further away and lower: the PC2 title is not clipped at the bottom
         scene_camera={
-            "eye": {"x": 1.6, "y": 1.6, "z": 1.0},
+            "eye": {"x": 2.0, "y": 2.0, "z": 1.2},
             "center": {"x": 0, "y": 0, "z": -0.15},
         },
     )
@@ -190,7 +199,8 @@ def pca_scatter_2d(
     With `star` (pc1, pc2[, pc3]) the real customers are faded and the new customer is a big
     ★ in its segment's colour (dark outline), so it stands out on any background.
     """
-    title = "Where this customer sits on the PCA map" if star is not None else "PCA map"
+    # short star title: the Home card is ~230 px wide at a 1280 px window
+    title = "PCA map: ★ = this customer" if star is not None else "PCA map"
     if _empty(segments) or not {"pc1", "pc2", "segment"} <= set(segments.columns):
         return VC.empty_figure("No PCA coordinates.", title)
     names = _names(names, segments)
@@ -429,8 +439,9 @@ def scree_plot(explained: Sequence[float] | None) -> go.Figure:
         )
     )
     fig.update_yaxes(range=[0, 1.1], tickformat=".0%")
-    VC.style(fig, "Scree plot", "Principal component", "Variance explained (%)", height=380)
-    fig.update_layout(legend={"orientation": "h", "y": 1.02, "x": 0, "yanchor": "bottom"})
+    VC.style(fig, "Scree plot", "Principal component", "Variance explained (%)", height=420)
+    # legend under the axis title: above the plot it ran into the title in a narrow column
+    fig.update_layout(legend={"orientation": "h", "y": -0.25, "x": 0, "yanchor": "top"})
     return fig
 
 
@@ -623,14 +634,17 @@ def share_bars(profiles: pd.DataFrame | None, names: Mapping[int, str] | None = 
                 hovertemplate=f"%{{x}}<br>{label}: %{{y:.1%}}<extra></extra>",
             )
         )
-        fig.add_trace(  # legend-only swatch in neutral grey: the measure is the texture
+        # legend-only swatch in neutral grey: the measure is the texture + lightness (rgba,
+        # not opacity: legend swatches ignore marker opacity, so both looked the same grey)
+        swatch = P.GREY if opacity >= 1 else _rgba(P.GREY, opacity)
+        fig.add_trace(
             go.Bar(
                 x=[None],
                 y=[None],
                 name=label,
                 legendgroup=label,
                 offsetgroup=col,  # same slot as its real bars: no empty gap in the groups
-                marker={"color": P.GREY, "opacity": opacity, "pattern": pattern_spec},
+                marker={"color": swatch, "pattern": pattern_spec},
                 hoverinfo="skip",
             )
         )
@@ -672,7 +686,7 @@ def segment_boxplots(
         fig.add_trace(
             go.Box(
                 y=v,
-                name=f"{sid} · {name}",
+                name=VC.wrap_label(f"{sid} · {name}"),
                 marker={"color": colour, "size": 3, "opacity": 0.5},
                 line={"color": colour, "width": 1.5},
                 fillcolor=_rgba(colour, 0.25),
@@ -684,8 +698,11 @@ def segment_boxplots(
     label = feature_label(feature)
     VC.style(fig, f"{feature_label(feature, False)} by segment", "Segment", label, height=440)
     if use_log:
-        VC.log_axis(fig, "y", label)
-    fig.update_layout(showlegend=True, legend_title_text="Segment")
+        VC.log_axis(fig, "y", label, dtick=1)  # decades only: "2 / 5" labels crowded it
+    # no legend: the x labels already name each segment (a legend squeezed a half-width
+    # column and forced rotated labels); long names wrap instead of rotating
+    fig.update_layout(showlegend=False)
+    fig.update_xaxes(tickangle=0)
     return fig
 
 

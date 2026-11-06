@@ -102,6 +102,18 @@ def empty_figure(message: str, title: str = "") -> go.Figure:
     return style(fig, title, height=300)
 
 
+def wrap_label(text, width: int = 14) -> str:
+    """Break a category label into <br>-joined lines of <= width characters (word breaks), so
+    narrow charts can keep horizontal tick labels."""
+    words, lines = str(text).split(), []
+    for w in words:
+        if lines and len(lines[-1]) + 1 + len(w) <= width:
+            lines[-1] += " " + w
+        else:
+            lines.append(w)
+    return "<br>".join(lines) if lines else str(text)
+
+
 def md_escape(text) -> str:
     """Escape markdown / LaTeX characters (product names) before st.markdown."""
     out = str(text)

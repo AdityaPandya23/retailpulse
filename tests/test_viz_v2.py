@@ -112,9 +112,12 @@ def test_share_bars(profiles):
     assert list(bars[0].marker.color) == [P.segment_colour(i) for i in range(3)]
     assert bars[0].marker.pattern.shape == "/" and bars[1].marker.pattern.shape == ""
     assert not any(t.showlegend for t in bars)
-    # legend swatches are neutral grey: the texture (not the colour) names the measure
+    # legend swatches are neutral grey: texture + lightness (not the hue) name the measure;
+    # lightness via rgba because legend swatches ignore marker opacity (P6c visual pass)
     assert [t.name for t in legend] == ["Share of customers", "Share of revenue"]
-    assert all(t.marker.color == P.GREY for t in legend)
+    light, solid = (t.marker.color for t in legend)
+    assert light.startswith("rgba(") and light.endswith(",0.45)") and solid == P.GREY
+    assert all(t.marker.opacity is None for t in legend)
     assert fig.layout.barmode == "group"
     assert _is_empty(S.share_bars(profiles.drop(columns="revenue_share")))
 
@@ -389,3 +392,66 @@ def test_knn_best_k():
     assert VP.knn_best_k({"knn_k": 75}) == 75
     assert VP.knn_best_k({"models": {"knn": {"k": 20.0}}}) == 20
     assert VP.knn_best_k({}) is None and VP.knn_best_k(None) is None
+
+
+# ------------------------------------------------------------------ P6c: narrow columns
+# Visual pass at a 1280 px window: Home cards ~230 px, half columns ~400 px, [3, 2] ~480 px.
+def test_home_cards_fit_a_narrow_column(segments):
+    pca = S.pca_scatter_2d(segments, NAMES, [0.5, 0.2, 0.1], star=[0.0, 0.0], star_segment=0)
+    assert len(pca.layout.title.text) <= 28  # the old title was clipped at ~230 px
+    probs = VP.model_probability_bars(_probs(), 90)
+    assert probs.layout.showlegend is False  # legend collided with the axis title
+    assert list(probs.layout.xaxis.tickvals) == [0, 0.5, 1]  # 5 ticks were rotated
+    assert len(VR.rules_bubble(_bubble_rules()).layout.title.text) <= 40
+
+
+def _bubble_rules() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "scope": ["overall"] * 3,
+            "antecedents": ["A", "B", "C"],
+            "consequents": ["D", "E", "F"],
+            "support": [0.01, 0.012, 0.02],
+            "confidence": [0.4, 0.6, 0.9],
+            "lift": [5.0, 20.0, 50.0],
+        }
+    )
+
+
+def test_knn_axis_does_not_move_with_the_slider(curve):
+    figs = [VP.knn_simple_figure(curve, k, 75) for k in (1, 20, int(curve["k"].max()))]
+    ranges = {tuple(f.layout.xaxis.range) for f in figs}
+    assert len(ranges) == 1  # same x range whatever k is selected
+    ax = figs[0].layout.xaxis
+    assert all(t in VP.KNN_TICKS for t in ax.tickvals) and 1 in ax.tickvals
+    lo, hi = ax.range
+    assert lo < 0 < np.log10(curve["k"].max()) < hi  # k = 1 and k max inside, not on the edge
+    dots = figs[0].data[2:]
+    assert all(t.cliponaxis is False for t in dots)  # the k = 1 train dot sits on 0%
+
+
+def test_legends_leave_labels_and_titles_alone(segments, profiles):
+    scree = S.scree_plot([0.5, 0.2, 0.1])
+    assert scree.layout.legend.y < 0  # under the plot, not beside the title
+    pareto = pd.DataFrame({"customer_share": [0, 0.01, 0.2, 1], "revenue_share": [0, 0.3, 0.8, 1]})
+    p = D.pareto_curve(pareto, {"top_1pct_revenue_share": 0.3})
+    assert p.layout.legend.y < 0  # inside the plot it covered the "top 1%" label
+    p3 = S.pca_scatter_3d(segments, NAMES, [0.5, 0.2, 0.1])
+    assert p3.layout.legend.orientation == "h"  # a right legend squeezed the 3D scene
+
+
+def test_boxplots_wrap_names_instead_of_a_legend():
+    rng = np.random.default_rng(42)
+    joined = pd.DataFrame(
+        {"segment": np.repeat([0, 1, 2], 50), "monetary": rng.lognormal(6, 1.5, 150)}
+    )
+    names = {0: "Champions", 1: "Regulars", 2: "Lost / Hibernating"}
+    fig = S.segment_boxplots(joined, "monetary", names, log=True)
+    assert fig.layout.showlegend is False
+    assert fig.layout.xaxis.tickangle == 0
+    assert [t.name for t in fig.data] == [
+        "0 · Champions",
+        "1 · Regulars",
+        "2 · Lost /<br>Hibernating",
+    ]
+    assert fig.layout.yaxis.type == "log" and fig.layout.yaxis.dtick == 1

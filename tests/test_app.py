@@ -206,3 +206,31 @@ def test_page_links_point_at_real_files(page):
     targets = re.findall(r'st\.page_link\(\s*"([^"]+)"', source)
     assert targets, page
     assert all((APP_DIR / t).is_file() for t in targets), targets
+
+
+def _badge_and_verdict(at) -> tuple[str, str]:
+    """(segment badge markdown, verdict markdown) of the Home cards."""
+    badge = next(m.value for m in at.markdown if m.value.startswith("Segment: "))
+    verdict = next(m.value for m in at.markdown if "come back** within" in m.value)
+    return badge, verdict
+
+
+def test_home_first_and_last_preset_change_badge_and_probability(run_app_page):
+    """Typical <first segment> vs Typical <last segment>: badge + chosen P(return) change."""
+    at = run_app_page("Home.py")
+    presets = pd.read_parquet(C.mock_path(C.SEGMENT_PRESETS_PARQUET))
+    names = {int(k): v for k, v in _mock_metrics()["segment"]["segment_names"].items()}
+    first, last = int(presets["segment"].min()), int(presets["segment"].max())
+    assert first != last
+    seen = {}
+    for sid in (first, last):
+        at.button(key=f"preset_{sid}").click().run()
+        assert not at.exception, at.exception
+        badge, verdict = _badge_and_verdict(at)
+        assert names[sid] in badge and f"(segment {sid})" in badge
+        p = re.search(r"\(([^)]+)\) gives (\d+)%", verdict)
+        assert p, verdict
+        seen[sid] = (badge, p.group(1), int(p.group(2)))
+    assert seen[first][0] != seen[last][0]  # segment badge text changed
+    assert seen[first][1] == seen[last][1]  # same chosen model ...
+    assert seen[first][2] != seen[last][2]  # ... different P(return)

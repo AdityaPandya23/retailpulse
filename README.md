@@ -62,7 +62,8 @@ pip install -r requirements.txt pytest ruff   # exact versions; installs retailp
 streamlit run app/Home.py                     # the app, on the committed artifacts
 python -m retailpulse.pipeline                # rebuild: downloads the data once, then runs every stage
 python -m retailpulse.pipeline --force        # rebuild every stage from scratch
-pytest -q                                     # tests (synthetic fixture + artifacts/mock only)
+pytest -q                                     # tests (synthetic fixture + artifacts/mock;
+                                              # 1 test checks the committed app artifacts agree)
 ruff check . ; ruff format .
 ```
 
@@ -80,7 +81,8 @@ src/retailpulse/       all logic: ingest, clean, warehouse (DuckDB), features, e
 app/Home.py, pages/    Streamlit app (pages only lay out; app/components/data.py reads artifacts)
 artifacts/             pipeline outputs; only the app inputs + artifacts/mock/ are in git
 data/                  raw + cleaned data (downloaded by the pipeline, never committed)
-tests/                 pytest on a synthetic fixture, never the real dataset
+tests/                 pytest on a synthetic fixture, never data/ (one exception reads only the
+                       committed app artifacts: saved models reproduce stored predictions)
 PLAN.md, PROGRESS.md   design and build log;  DEMO_SCRIPT.md: demo walkthrough
 ```
 

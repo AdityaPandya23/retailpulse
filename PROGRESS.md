@@ -186,6 +186,31 @@
 - Tests: 286 pass (+11 regression tests). Ruff clean. Fresh headless server: 6/6 pages, 0 exceptions, no Mock
   badge (an older test server had kept port 8599; it is stopped and the check was rerun on a new one).
 
+## P6c Tests, visual pass, demo script — done (2026-11-07)
+- Tests: Home preset test (mock; Typical first vs last segment → badge + chosen model's P(return) both change);
+  tests/test_artifact_consistency.py (20 test-split customers, seed 42: all 3 pipelines in classifiers.joblib on
+  features_cutoff reproduce the stored p_return within 1e-9). 5 regression tests for the layout fixes below.
+- Visual pass at 1280 px (AppTest capture on real artifacts → kaleido PNG, scratch venv): Streamlit 1.66 sidebar
+  300 px + 5 rem padding → content 820 px, half 402, [3, 2] 482 / 322, Home cards ≈ 228. Fixed in viz/: Home PCA
+  title clipped; P(return) bars (rotated ticks, legend over axis title → 3 ticks, no legend); Pareto legend over
+  the "top 1%" label; scree legend beside the title; share-bar legend swatches looked the same (rgba, not
+  opacity); box plots (legend dropped, wrapped names, decade ticks); 3D PCA cropped (legend on top, camera
+  further); KNN x-range jumped with the slider (fixed range, round ticks, k = 1 dot no longer clipped); bubble title.
+- Headless `streamlit run` on port 8611: health ok, 6/6 pages over the websocket, 0 exceptions, no Mock badge
+  (Home cold 13.9 s, others 0.6–1.5 s); stopped only that server (3 older streamlit processes left running).
+- DEMO_SCRIPT.md rewritten for the hub flow (~8 min, checklist, Q&A); numbers read from the app + metrics.json.
+  Examiner examples: (10, 12, £3000, 600, £250, 120) → Champions, KNN 75%; (150, 2, £300, 300, £150, 20) →
+  Regulars, KNN 11%; both 3/3 agree. Typical Lost + recency 30 → Regulars, 11%.
+- Tests: 293 pass (286 + 7). Ruff clean. Headline numbers unchanged (k = 3, KNN k 75, AUC 0.790–0.795, lift 1.68).
+
+## P6c decisions
+- Consistency test uses the TEST split only: train p_return are out-of-fold CV scores, not the refit pipelines.
+- It reads committed artifacts via contracts (never data/), skips if a file is missing; README notes the exception.
+- Demo checklist: collapse the sidebar after switching the tour on; at 110–125% zoom with it open, Home cards are
+  ~190 px and chart titles clip. Examples kept away from the 35% threshold: (30, 1, £200, 30, £200, 15) gives
+  exactly 35% with 1 of 3 models agreeing, so the script warns about borderline customers instead.
+- README changed only in the test lines (no number or page description changed). Next: human items below.
+
 ## Open items (human)
 1. Push the tag so README's v1 link works: `git push origin v1-full`.
 2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.

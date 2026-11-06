@@ -23,6 +23,7 @@ from retailpulse.viz import palette as P
 MAX_CURVE_POINTS = 600  # per model: the real PR curves have ~3,000 points each
 OUTCOME_LABELS = ("Did not return", "Returned")
 GBP_TICKS = (1, 10, 100, 1_000, 10_000, 100_000)
+KNN_TICKS = (1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000)  # round ticks on the log k axis
 LEGEND_BELOW = {"orientation": "h", "x": 0, "y": -0.2, "yanchor": "top"}
 
 
@@ -570,10 +571,11 @@ def model_probability_bars(probs: pd.DataFrame | None, horizon_days: int = HORIZ
                 hovertemplate="%{y}: threshold %{x:.0%}<extra></extra>",
             )
         )
-    fig.update_xaxes(range=[0, 1.12], tickformat=".0%", tickvals=[0, 0.25, 0.5, 0.75, 1])
+    # 3 ticks + no legend: the Home card is ~230 px wide (the page caption explains the tick)
+    fig.update_xaxes(range=[0, 1.12], tickformat=".0%", tickvals=[0, 0.5, 1], tickangle=0)
     VC.style(fig, title, "Predicted probability", None, height=110 + 55 * len(d))
     fig.update_layout(
-        legend={"orientation": "h", "y": -0.35, "x": 0, "yanchor": "top"},
+        showlegend=False,
         margin={"l": 10, "r": 20, "t": 50, "b": 40},
         bargap=0.35,
     )
@@ -723,6 +725,7 @@ def knn_simple_figure(curve: pd.DataFrame | None, k_selected: int, best_k: int |
                     mode="markers",
                     marker={"color": colour, "size": 16, "line": {"color": P.INK, "width": 1.5}},
                     showlegend=False,
+                    cliponaxis=False,  # the k = 1 train dot sits on 0% (was cut in half)
                     hovertemplate=f"k = %{{x}}<br>{name.split(' (')[0]} %{{y:.1%}}<extra></extra>",
                 )
             )
@@ -740,7 +743,18 @@ def knn_simple_figure(curve: pd.DataFrame | None, k_selected: int, best_k: int |
             font={"color": P.INK, "size": 12},
         )
     VC.style(fig, title, "Number of neighbours k", "Error rate (1 − accuracy)", height=420)
-    VC.log_axis(fig, "x", "Number of neighbours k")
+    # fixed range + round ticks: autorange moved with the big dots (stray "8 9" ticks left
+    # of k = 1, a shifted 100 tick), so the axis jumped while the slider moved
+    k_lo, k_hi = float(c["k"].min()), float(c["k"].max())
+    ticks = [t for t in KNN_TICKS if k_lo <= t <= k_hi]
+    VC.log_axis(
+        fig,
+        "x",
+        "Number of neighbours k",
+        range=[np.log10(k_lo) - 0.04, np.log10(k_hi) + 0.04],
+        tickvals=ticks,
+        ticktext=[str(t) for t in ticks],
+    )
     fig.update_yaxes(tickformat=".0%", rangemode="tozero")
     fig.update_layout(
         legend={"orientation": "h", "y": -0.22, "x": 0, "yanchor": "top"}, margin={"t": 80}

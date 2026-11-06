@@ -66,3 +66,10 @@ def test_md_escape_is_shared_with_demo():
 
     assert demo.md_escape is md_escape
     assert md_escape("A_B *C* $1 [x]") == r"A\_B \*C\* \$1 \[x\]"
+
+
+def test_wrap_label_breaks_on_words():
+    assert VC.wrap_label("0 · Champions") == "0 · Champions"
+    assert VC.wrap_label("2 · Lost / Hibernating") == "2 · Lost /<br>Hibernating"
+    assert VC.wrap_label("Supercalifragilistic word", 10) == "Supercalifragilistic<br>word"
+    assert VC.wrap_label("") == ""

@@ -420,9 +420,11 @@ def pareto_curve(pareto: pd.DataFrame | None, eda: dict | None = None) -> go.Fig
         "Revenue concentration (Pareto / Lorenz curve)",
         "Share of customers (largest spenders first)",
         "Share of revenue",
-        height=420,
+        height=460,
     )
-    fig.update_layout(legend={"x": 0.98, "y": 0.2, "xanchor": "right", "yanchor": "bottom"})
+    # legend under the axis title: inside the plot it covered the "top 1%" label in a
+    # half-width column
+    fig.update_layout(legend={"orientation": "h", "y": -0.2, "x": 0, "yanchor": "top"})
     return fig
 
 

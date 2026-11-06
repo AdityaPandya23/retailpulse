@@ -121,7 +121,7 @@ def rule_explainer(top_rule: Mapping | None, n_invoices: int | None = None) -> d
 
 def rules_bubble(rules: pd.DataFrame | None) -> go.Figure:
     """Support (x) vs confidence (y) per overall rule; bubble size and colour = lift."""
-    title = "Every rule: support vs confidence (size and colour = lift)"
+    title = "Every rule (size and colour = lift)"  # fits a half-width column at 1280 px
     r = overall_rules(rules)
     if r.empty:
         return VC.empty_figure("No association rules.", title)

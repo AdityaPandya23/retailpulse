@@ -88,6 +88,7 @@ Stages: ingest → clean → warehouse → features → stats → cube → eda �
 | P1–P5 | data, features + stats, models, 4-page app, polish + deploy prep (= tag v1-full) | done |
 | P6a | simplified backend: 6 features, 3 models, overall rules, demo artifacts (+ review fixes) | done |
 | P6b | 6-page hub-and-spokes app, smoke tests, README app list, DEMO_SCRIPT rewrite | done |
+| P6c | preset + artifact-consistency tests, 1280 px visual pass, DEMO_SCRIPT for the hub flow | done |
 
 ## Remaining human TODOs
 1. Deploy on share.streamlit.io: repo AdityaPandya23/retailpulse, branch main, main file app/Home.py,
