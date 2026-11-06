@@ -518,6 +518,229 @@ def knn_figure(curve: pd.DataFrame | None, k_selected: int, k_chosen: int | None
     )
 
 
+# ------------------------------------------------------------------ v2: simple views
+KNN_K_CHOICES = (1, 5, 20, 100)  # + the best k (metrics) on the v2 select_slider
+OVERFIT = "memorises the training data (overfitting)"
+BALANCE = "best balance"
+UNDERFIT = "too simple (underfitting)"
+
+
+def simple_model_table(cls_metrics: Mapping | None) -> pd.DataFrame:
+    """model_table without PR-AUC: model, chosen marker, CV AUC, test AUC, accuracy, threshold."""
+    t = model_table(cls_metrics)
+    if t.empty:
+        return t
+    return t.drop(columns=["Test PR-AUC (AP)"]).rename(columns={"Best (train CV)": "Chosen"})
+
+
+def model_probability_bars(probs: pd.DataFrame | None, horizon_days: int = HORIZON_DAYS):
+    """Horizontal bar of P(return) per model (fixed colour) with each model's threshold as a
+    black tick; the chosen (best) model is labelled. probs: model, p_return, threshold, chosen."""
+    title = f"P(buys again within {horizon_days} days)"
+    if probs is None or probs.empty:
+        return VC.empty_figure("No classifiers available.", title)
+    d = probs.iloc[::-1]  # first model on top
+    labels = [
+        f"{m} ★ chosen" if c else str(m) for m, c in zip(d["model"], d["chosen"], strict=True)
+    ]
+    colours = [P.model_colour(str(m)) for m in d["model"]]
+    fig = go.Figure(
+        go.Bar(
+            x=d["p_return"],
+            y=labels,
+            orientation="h",
+            marker={"color": colours, "line": {"color": P.SURFACE, "width": 1}},
+            text=[f"{p:.0%}" for p in d["p_return"]],
+            textposition="outside",
+            textfont={"color": P.INK},
+            name="P(return)",
+            hovertemplate="%{y}: %{x:.1%}<extra></extra>",
+            cliponaxis=False,
+        )
+    )
+    thr = d["threshold"].astype("float64")
+    if thr.notna().any():
+        fig.add_trace(
+            go.Scatter(
+                x=thr,
+                y=labels,
+                mode="markers",
+                name="threshold (chosen on train)",
+                marker={"symbol": "line-ns", "size": 30, "line": {"color": P.INK, "width": 3}},
+                hovertemplate="%{y}: threshold %{x:.0%}<extra></extra>",
+            )
+        )
+    fig.update_xaxes(range=[0, 1.12], tickformat=".0%", tickvals=[0, 0.25, 0.5, 0.75, 1])
+    VC.style(fig, title, "Predicted probability", None, height=110 + 55 * len(d))
+    fig.update_layout(
+        legend={"orientation": "h", "y": -0.35, "x": 0, "yanchor": "top"},
+        margin={"l": 10, "r": 20, "t": 50, "b": 40},
+        bargap=0.35,
+    )
+    return fig
+
+
+def split_timeline(
+    cls_metrics: Mapping | None, data_start=None, horizon_days: int = HORIZON_DAYS
+) -> go.Figure:
+    """Out-of-time split: train snapshot -> its label window (ends at the cutoff) vs the test
+    snapshot at the cutoff -> the next horizon_days. Dates from metrics.json classify."""
+    title = "Out-of-time split: learn from the past, judge on the future"
+    m = cls_metrics or {}
+    t_cut, cut = m.get("train_cutoff"), m.get("test_cutoff")
+    if not t_cut or not cut:
+        return VC.empty_figure("Split dates are not recorded in metrics.json.", title)
+    t_cut, cut = pd.Timestamp(t_cut), pd.Timestamp(cut)
+    horizon = pd.Timedelta(days=int(horizon_days))
+    t_win = [pd.Timestamp(x) for x in (m.get("train_label_window") or [t_cut, t_cut + horizon])]
+    s_win = [pd.Timestamp(x) for x in (m.get("test_label_window") or [cut, cut + horizon])]
+    start = pd.Timestamp(data_start) if data_start else t_cut - 4 * horizon
+    rows = ("Train (model learns)", "Test (model is judged)")
+    history = "history → features (only data before the snapshot)"
+    outcome = f"outcome → label: bought again in the next {int(horizon_days)} days?"
+    spans = (
+        (rows[0], start, t_cut, history, "before", f"data before {t_cut.date()}"),
+        (rows[0], t_win[0], t_win[1], outcome, "after", f"{int(horizon_days)} days"),
+        (rows[1], start, cut, history, "before", f"data before {cut.date()}"),
+        (rows[1], s_win[0], s_win[1], outcome, "after", f"{int(horizon_days)} days"),
+    )
+    fig = go.Figure()
+    shown = set()
+    for row, a, b, label, period, text in spans:
+        ms = (b - a).total_seconds() * 1000
+        fig.add_trace(
+            go.Bar(
+                x=[ms],
+                base=[a.isoformat()],
+                y=[row],
+                orientation="h",
+                name=label,
+                legendgroup=label,
+                showlegend=label not in shown,
+                marker={
+                    "color": P.PERIOD_COLOURS[period],
+                    "line": {"color": P.SURFACE, "width": 1},
+                },
+                text=[text],
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont={"color": P.SURFACE, "size": 12},
+                hovertemplate=f"{row}<br>{label}<br>{a.date()} → {b.date()}<extra></extra>",
+            )
+        )
+        shown.add(label)
+    for x, text, anchor in ((t_cut, "train snapshot", "right"), (cut, "cutoff", "left")):
+        fig.add_vline(x=str(x.date()), line={"color": P.INK, "width": 1.5, "dash": "dash"})
+        fig.add_annotation(
+            x=str(x.date()),
+            y=1,
+            yref="paper",
+            yanchor="bottom",
+            xanchor=anchor,
+            showarrow=False,
+            text=f"{text} {x.date()}",
+            font={"color": P.INK, "size": 12},
+        )
+    fig.update_xaxes(type="date")
+    fig.update_yaxes(autorange="reversed", showgrid=False)
+    fig.update_layout(barmode="overlay", bargap=0.35)
+    VC.style(fig, title, None, None, height=280)
+    fig.update_layout(
+        legend={"orientation": "h", "y": -0.3, "x": 0, "yanchor": "top"},
+        margin={"l": 10, "r": 20, "t": 80, "b": 40},
+    )
+    return fig
+
+
+def knn_k_options(
+    curve: pd.DataFrame | None, best_k: int | None, wanted=KNN_K_CHOICES
+) -> list[int]:
+    """Sorted, de-duplicated k values for the slider: wanted + best k, limited to the curve."""
+    if curve is None or curve.empty or "k" not in curve:
+        return []
+    available = {int(k) for k in curve["k"]}
+    ks = {int(k) for k in wanted} | ({int(best_k)} if best_k is not None else set())
+    return sorted(k for k in ks if k in available)
+
+
+def knn_accuracies(curve: pd.DataFrame | None, k: int) -> dict:
+    """Train / test accuracy at k (1 - error) and their gap (train - test)."""
+    pt = knn_point(curve, k) if curve is not None else {}
+    if not pt:
+        return {}
+    train, test = 1 - pt["train_error"], 1 - pt["test_error"]
+    return {"k": int(pt["k"]), "train_accuracy": train, "test_accuracy": test, "gap": train - test}
+
+
+def knn_regime(k: int, best_k: int | None) -> str:
+    """One sentence: small k overfits, the best k balances, large k underfits."""
+    if best_k is None:
+        return f"k = {k}."
+    if int(k) < int(best_k):
+        return f"k = {k} is small: the model {OVERFIT}."
+    if int(k) == int(best_k):
+        return f"k = {k} is the {BALANCE}: chosen by train cross-validation."
+    return f"k = {k} is large: the model is {UNDERFIT}."
+
+
+def knn_simple_figure(curve: pd.DataFrame | None, k_selected: int, best_k: int | None) -> go.Figure:
+    """Train and test error vs k on a log x axis; big dots at the selected k on both lines,
+    a dashed vertical line at the best k. No animation."""
+    title = "KNN: error vs number of neighbours k"
+    if curve is None or curve.empty or not {"k", "train_error", "test_error"} <= set(curve):
+        return VC.empty_figure("No KNN curve available.", title)
+    c = curve.sort_values("k")
+    series = (
+        ("train_error", "train error (past snapshot)", P.PERIOD_COLOURS["before"], "solid"),
+        ("test_error", "test error (future window)", P.PERIOD_COLOURS["after"], "dash"),
+    )
+    fig = go.Figure()
+    for col, name, colour, dash in series:
+        fig.add_trace(
+            go.Scatter(
+                x=c["k"],
+                y=c[col],
+                mode="lines",
+                name=name,
+                line={"color": colour, "dash": dash, "width": 2.5},
+                hovertemplate=f"k %{{x}}<br>{name.split(' (')[0]} %{{y:.1%}}<extra></extra>",
+            )
+        )
+    pt = knn_point(c, k_selected)
+    if pt:
+        for col, name, colour, _ in series:
+            fig.add_trace(
+                go.Scatter(
+                    x=[pt["k"]],
+                    y=[pt[col]],
+                    mode="markers",
+                    marker={"color": colour, "size": 16, "line": {"color": P.INK, "width": 1.5}},
+                    showlegend=False,
+                    hovertemplate=f"k = %{{x}}<br>{name.split(' (')[0]} %{{y:.1%}}<extra></extra>",
+                )
+            )
+    if best_k is not None:
+        # on a log axis shapes take the raw value, annotations take log10 (plotly.js)
+        fig.add_vline(x=int(best_k), line={"color": P.INK, "dash": "dash", "width": 1.5})
+        fig.add_annotation(
+            x=float(np.log10(int(best_k))),
+            y=1,
+            yref="paper",
+            yanchor="bottom",
+            xanchor="center",
+            showarrow=False,
+            text=f"best k = {int(best_k)}",
+            font={"color": P.INK, "size": 12},
+        )
+    VC.style(fig, title, "Number of neighbours k", "Error rate (1 − accuracy)", height=420)
+    VC.log_axis(fig, "x", "Number of neighbours k")
+    fig.update_yaxes(tickformat=".0%", rangemode="tozero")
+    fig.update_layout(
+        legend={"orientation": "h", "y": -0.22, "x": 0, "yanchor": "top"}, margin={"t": 80}
+    )
+    return fig
+
+
 # ------------------------------------------------------------------ regression
 def _errors(y, pred) -> dict:
     y, pred = np.asarray(y, dtype="float64"), np.asarray(pred, dtype="float64")

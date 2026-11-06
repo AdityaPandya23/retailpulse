@@ -139,6 +139,19 @@ def missing_files() -> list[str]:
     ]
 
 
+@st.cache_data(show_spinner=False, max_entries=4)
+def _read_text(path: str, mtime: float) -> str:
+    return Path(path).read_text(encoding="utf-8")
+
+
+def limitations() -> list[str]:
+    """The bullets under "## Limitations" in README.md (same wording as the README)."""
+    from retailpulse.insights import limitations as parse
+
+    file = Path(C.README_MD)
+    return parse(_read_text(str(file), _mtime(file))) if file.exists() else []
+
+
 # ------------------------------------------------------------------ segment helpers
 def segment_names() -> dict[int, str]:
     """{segment id: name} from metrics.json (k and names are never hard-coded)."""

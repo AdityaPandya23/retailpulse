@@ -149,8 +149,35 @@
   then at.switch_page("pages/<file>.py"); running a page file directly cannot link back to "Home.py".
 - Next: P6b = 6-page hub-and-spokes app (PLAN.md "App v2"), smoke tests, README page list, DEMO_SCRIPT rewrite.
 
+## P6b Simplified 6-page app — done (2026-11-07)
+- App v2 = hub and spokes: Home (live demo) + 2_Data, 3_Segmentation, 4_Prediction, 5_Recommendation, 6_Insights;
+  the 4 v1 pages and their 2 test files deleted. Pages only lay out; each explainer links back to Home.
+- New logic: `demo.py` (KPI facts, pipeline DOT, input specs, presets, score one customer, verdict, offer lines),
+  `insights.py` (per-segment table, action rule, README limitations parser), `viz/rules.py`; figures added to
+  viz/segments (2D PCA + ★, PC meanings, customer % vs revenue % bars; k panels take a metric subset) and
+  viz/predictions (P(return) bars + thresholds, split timeline, simple model table, KNN log-axis chart).
+- Real artifacts: k = 3; Typical Champions → knn 63% (threshold 35%, 3/3 agree), Regulars 20%, Lost 3%;
+  basket POPPY'S PLAYHOUSE BEDROOM → Kitchen (conf 86%, lift 51.4), Livingroom (71%, 54.9) + 3 best sellers.
+  KNN k 1: train 100% / test 67.8%; best k 75: 78.6% / 70.7%. Actions: Champions Reward and keep, Regulars
+  Second-order offer, Lost / Hibernating Win-back offer.
+- Checks: AppTest on mock + real (Home, every page, presets, reveal, KNN slider, 3D toggle, picker); headless
+  `streamlit run`: /_stcore/health ok and all 6 pages rendered over the websocket on the real artifacts with
+  0 exceptions and no Mock badge (0.8–2.1 s). Figures rendered with kaleido (scratch venv) and fixed: best-k
+  line on the log axis, timeline axis title over the legend, clipped Home PCA title, share-bar legend.
+- Tests: 275 pass (245 − 22 v1 app tests + 52 new: app smoke 16, demo 10, insights 9, viz v2 17). Ruff clean.
+- Docs: README app section, DEMO_SCRIPT.md rewritten for v2 (~7 min, live numbers), PLAN P6b done.
+
+## P6b decisions
+- Default basket = the top rule's antecedents (metrics.json), so the first view shows a "because you bought" line.
+- Home inputs live in session state (plain keys) and survive page switches; presets are cast to int / float per input.
+- Pipeline diagram: rules start at Clean (mined from invoices, not customer features); DOT string, no graphviz pkg.
+- Limitations are parsed from README.md "## Limitations" via data.limitations() (contracts.README_MD), same wording.
+- Came back % = profiles.bought_again_share (fallback: test-split outcome); Avg P(return) = chosen model, test split.
+- Action rule per segment in order, first match wins; ties go to the lowest segment id (v2 has no "Reward" tie).
+- Next: human items below (push tag, deploy, rehearse DEMO_SCRIPT.md v2).
+
 ## Open items (human)
 1. Push the tag so README's v1 link works: `git push origin v1-full`.
 2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.
-3. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md once (after P6b rewrites it).
+3. Open the live app (no "Mock data" badge) and rehearse DEMO_SCRIPT.md (v2) once.
 4. Optional after P6b: drop classifier.joblib (classifiers.joblib has the best model too) — contracts, stage, tests.

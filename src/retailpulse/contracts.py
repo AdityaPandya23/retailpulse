@@ -16,7 +16,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from retailpulse.config import ARTIFACTS_DIR, PREDICT, PROCESSED_DIR, RAW_DIR, SEGMENT, XLSX_NAME
+from retailpulse.config import (
+    ARTIFACTS_DIR,
+    PREDICT,
+    PROCESSED_DIR,
+    RAW_DIR,
+    ROOT,
+    SEGMENT,
+    XLSX_NAME,
+)
 
 # ---- data layer (large, never deployed) ----
 RAW_ZIP = RAW_DIR / "online_retail_ii.zip"
@@ -327,6 +335,9 @@ QUALITY_JSONS = (
     MISSING_ID_JSON,
     WAREHOUSE_SUMMARY_JSON,
 )
+
+# ---- docs the v2 app shows (tracked in git, not an artifact): Insights limitations ----
+README_MD = ROOT / "README.md"
 
 # ---- what the app reads (P5 deploy: track exactly these) ----
 APP_PARQUETS = tuple(p for p in MOCKED_PARQUETS)

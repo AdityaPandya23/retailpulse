@@ -50,6 +50,20 @@ FEATURE_WHAT = {
     "non_uk_share": "non-UK share of spend",
 }
 
+# feature -> one plain line for the v2 Segmentation page (what the number means)
+FEATURE_MEANING = {
+    "recency": "days since the customer's last purchase (small = bought recently)",
+    "frequency": "number of separate orders (invoices)",
+    "monetary": "total amount spent (£)",
+    "tenure": "days since the first purchase (how long they have been a customer)",
+    "avg_basket_value": "average amount per order (£) = monetary / frequency",
+    "n_distinct_products": "number of different products bought",
+    "mean_interpurchase_days": "average days between two purchase days",
+    "return_rate": "share of the bought value that was returned",
+    "non_uk_share": "share of spend shipped outside the UK",
+}
+STAR_SIZE = 26
+
 
 def feature_label(feature: str, with_unit: bool = True) -> str:
     label, unit, _ = FEATURE_INFO.get(feature, (feature.replace("_", " ").capitalize(), "", ""))
@@ -159,6 +173,109 @@ def pca_scatter_3d(
         },
     )
     return fig
+
+
+def pca_scatter_2d(
+    segments: pd.DataFrame | None,
+    names: Mapping[int, str] | None = None,
+    explained: Sequence[float] | None = None,
+    n: int = MAX_POINTS,
+    star: Sequence[float] | None = None,
+    star_segment: int | None = None,
+    star_label: str = "New customer",
+    height: int = 520,
+) -> go.Figure:
+    """PC1 vs PC2 scatter, one trace per segment (id order, fixed colours), <= n points.
+
+    With `star` (pc1, pc2[, pc3]) the real customers are faded and the new customer is a big
+    ★ in its segment's colour (dark outline), so it stands out on any background.
+    """
+    title = "Where this customer sits on the PCA map" if star is not None else "PCA map"
+    if _empty(segments) or not {"pc1", "pc2", "segment"} <= set(segments.columns):
+        return VC.empty_figure("No PCA coordinates.", title)
+    names = _names(names, segments)
+    pts = sample_points(segments, n)
+    faded = star is not None
+    fig = go.Figure()
+    for sid, name in names.items():
+        d = pts[pts["segment"] == sid]
+        if d.empty:
+            continue
+        colour = P.segment_colour(sid)
+        custom = d[["customer_id"]].to_numpy() if "customer_id" in d else None
+        fig.add_trace(
+            go.Scatter(
+                x=d["pc1"],
+                y=d["pc2"],
+                mode="markers",
+                name=f"{sid} · {name}",
+                marker={
+                    "size": 4 if faded else 5,
+                    "color": colour,
+                    "opacity": 0.25 if faded else 0.7,
+                    "line": {**P.marker_line(colour), "width": 0},
+                },
+                customdata=custom,
+                hovertemplate=(
+                    (f"Customer %{{customdata[0]}}<br>{name}" if custom is not None else name)
+                    + "<br>PC1 %{x:.2f} · PC2 %{y:.2f}<extra></extra>"
+                ),
+            )
+        )
+    if star is not None:
+        colour = P.segment_colour(star_segment) if star_segment is not None else P.INK
+        seg_name = names.get(int(star_segment), "") if star_segment is not None else ""
+        fig.add_trace(
+            go.Scatter(
+                x=[float(star[0])],
+                y=[float(star[1])],
+                mode="markers",
+                name=f"★ {star_label}",
+                marker={
+                    "symbol": "star",
+                    "size": STAR_SIZE,
+                    "color": colour,
+                    "line": {"color": P.INK, "width": 1.5},
+                },
+                hovertemplate=f"{star_label}<br>{seg_name}<br>PC1 %{{x:.2f}} · PC2 %{{y:.2f}}"
+                "<extra></extra>",
+            )
+        )
+    shown = len(pts)
+    if shown < len(segments) and star is None:
+        title += f": {shown:,} of {len(segments):,} customers (seed {SEED})"
+    VC.style(fig, title, _pct_axis(explained, 0), _pct_axis(explained, 1), height=height)
+    fig.update_layout(
+        legend={"orientation": "h", "y": -0.18, "x": 0, "yanchor": "top", "itemsizing": "constant"}
+    )
+    return fig
+
+
+def pc_meanings(
+    loadings: pd.DataFrame | None, explained: Sequence[float] | None = None, top: int = 3
+) -> list[str]:
+    """One plain line per PC: its share of variance and the `top` features that drive it.
+
+    A PC's sign is arbitrary, so the line says what a HIGH score means ("higher X, lower Y").
+    """
+    if _empty(loadings) or "feature" not in loadings.columns:
+        return []
+    pcs = [c for c in ("pc1", "pc2", "pc3") if c in loadings.columns]
+    lines = []
+    for i, pc in enumerate(pcs):
+        w = loadings.set_index("feature")[pc].astype(float)
+        strongest = w.reindex(w.abs().sort_values(ascending=False).index).head(top)
+        parts = [
+            f"{'higher' if v > 0 else 'lower'} {FEATURE_WHAT.get(f, f.replace('_', ' '))}"
+            for f, v in strongest.items()
+        ]
+        share = (
+            f" ({_num(explained[i]):.0%} of variance)"
+            if explained is not None and i < len(explained) and np.isfinite(_num(explained[i]))
+            else ""
+        )
+        lines.append(f"**PC{i + 1}**{share}: a high score means " + ", ".join(parts) + ".")
+    return lines
 
 
 def pca_biplot(
@@ -329,15 +446,23 @@ K_PANELS = (
 CHOSEN_COLOUR = P.VERMILLION
 
 
-def k_selection_panels(ksel: pd.DataFrame | None, chosen_k: int | None = None) -> go.Figure:
-    """Small multiples of every k-selection metric present; the chosen k marked on each."""
+def k_selection_panels(
+    ksel: pd.DataFrame | None,
+    chosen_k: int | None = None,
+    metrics: Sequence[str] | None = None,
+) -> go.Figure:
+    """Small multiples of every k-selection metric present; the chosen k marked on each.
+
+    metrics: only these K_PANELS columns, in this order (v2: ("wcss", "silhouette")).
+    """
     if _empty(ksel) or "k" not in ksel.columns:
         return VC.empty_figure("No k-selection results.", "Choosing k")
     k = ksel.sort_values("k")
-    panels = [p for p in K_PANELS if p[0] in k.columns and k[p[0]].notna().any()]
+    wanted = K_PANELS if metrics is None else [p for m in metrics for p in K_PANELS if p[0] == m]
+    panels = [p for p in wanted if p[0] in k.columns and k[p[0]].notna().any()]
     if not panels:
         return VC.empty_figure("No k-selection metrics.", "Choosing k")
-    cols = 3 if len(panels) > 4 else 2
+    cols = 3 if len(panels) > 4 else min(2, len(panels))
     rows = int(np.ceil(len(panels) / cols))
     fig = make_subplots(
         rows=rows,
@@ -405,11 +530,18 @@ def k_selection_panels(ksel: pd.DataFrame | None, chosen_k: int | None = None) -
     for c in range(1, cols + 1):
         fig.update_xaxes(title_text="k (number of segments)", row=rows, col=c)
     k_lo, k_hi = int(k["k"].min()), int(k["k"].max())
-    VC.style(fig, f"Choosing k: every metric for k = {k_lo} … {k_hi}", height=300 * rows + 80)
+    which = (
+        "every metric"
+        if metrics is None
+        else " and ".join(p[0].upper() if p[0] == "wcss" else p[0] for p in panels)
+    )
+    height = 300 * rows + 80 if rows > 1 else 420
+    VC.style(fig, f"Choosing k: {which} for k = {k_lo} … {k_hi}", height=height)
     for ann in fig.layout.annotations:
         if ann.text in {p[1] for p in panels}:
             ann.font = {"color": P.MUTED_INK, "size": 12}
-    fig.update_layout(legend={"orientation": "h", "y": -0.08, "x": 0, "yanchor": "top"})
+    legend_y = -0.08 if rows > 1 else -0.28
+    fig.update_layout(legend={"orientation": "h", "y": legend_y, "x": 0, "yanchor": "top"})
     return fig
 
 
@@ -447,6 +579,67 @@ def profile_cards(profiles: pd.DataFrame | None, names: Mapping[int, str] | None
             {"segment": sid, "name": name, "colour": P.segment_colour(sid), "lines": lines}
         )
     return cards
+
+
+SHARE_MEASURES = (  # (column, legend label, pattern, opacity): measure = texture, segment = hue
+    ("customer_share", "Share of customers", "/", 0.45),
+    ("revenue_share", "Share of revenue", "", 1.0),
+)
+
+
+def share_bars(profiles: pd.DataFrame | None, names: Mapping[int, str] | None = None) -> go.Figure:
+    """Customer % vs revenue % per segment: grouped bars in the segment's colour; customers
+    hatched + light, revenue solid (the legend names both, so colour never works alone)."""
+    title = "Share of customers vs share of revenue"
+    cols = {"segment", "customer_share", "revenue_share"}
+    if _empty(profiles) or not cols <= set(profiles.columns):
+        return VC.empty_figure("No segment profiles.", title)
+    names = _names(names, profiles)
+    p = profiles.assign(segment=profiles["segment"].astype(int)).set_index("segment")
+    ids = [s for s in names if s in p.index]
+    labels = [f"{s} · {names[s]}" for s in ids]
+    colours = [P.segment_colour(s) for s in ids]
+    fig = go.Figure()
+    for col, label, pattern, opacity in SHARE_MEASURES:
+        vals = [float(p.at[s, col]) for s in ids]
+        pattern_spec = {"shape": pattern, "fgcolor": P.INK, "size": 6, "solidity": 0.2}
+        fig.add_trace(
+            go.Bar(
+                x=labels,
+                y=vals,
+                name=label,
+                legendgroup=label,
+                offsetgroup=col,
+                showlegend=False,  # a multi-colour bar's legend swatch shows only one colour
+                marker={
+                    "color": colours,
+                    "opacity": opacity,
+                    "pattern": pattern_spec,
+                    "line": {"color": colours, "width": 1.5},
+                },
+                text=[f"{v:.0%}" for v in vals],
+                textposition="outside",
+                textfont={"color": P.INK},
+                hovertemplate=f"%{{x}}<br>{label}: %{{y:.1%}}<extra></extra>",
+            )
+        )
+        fig.add_trace(  # legend-only swatch in neutral grey: the measure is the texture
+            go.Bar(
+                x=[None],
+                y=[None],
+                name=label,
+                legendgroup=label,
+                offsetgroup=col,  # same slot as its real bars: no empty gap in the groups
+                marker={"color": P.GREY, "opacity": opacity, "pattern": pattern_spec},
+                hoverinfo="skip",
+            )
+        )
+    top = max(float(p[["customer_share", "revenue_share"]].to_numpy().max()), 0.01)
+    fig.update_yaxes(tickformat=".0%", range=[0, min(1.0, top * 1.18) + 0.02])
+    fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.08)
+    VC.style(fig, title, "Segment", "Share (%)", height=400)
+    fig.update_layout(legend={"orientation": "h", "y": 1.02, "x": 0, "yanchor": "bottom"})
+    return fig
 
 
 def segment_feature_frame(

@@ -179,7 +179,10 @@ def mock_artifacts(monkeypatch):
 
 @pytest.fixture
 def run_app_page(mock_artifacts):
-    """run_app_page("pages/3_Predictions.py") -> AppTest after its first run (mock data)."""
+    """run_app_page("Home.py") -> AppTest after its first run (mock data).
+
+    Open pages with at.switch_page("pages/<file>.py"): st.page_link needs Home.py as entrypoint.
+    """
     from streamlit.testing.v1 import AppTest
 
     def _run(rel_path: str, timeout: float = 120):

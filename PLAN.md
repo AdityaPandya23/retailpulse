@@ -54,7 +54,8 @@ Offline pipeline writes artifacts → Streamlit app only reads artifacts (app/co
 metrics / model, paths from contracts.py, fallback to artifacts/mock/ with a "Mock data" badge).
 ```
 src/retailpulse/  config contracts pipeline ingest clean warehouse features cube eda mock app_data deploy
-                  stats/ segment/ predict/ baskets/ viz/ (Plotly figure functions)
+                  demo (Home logic) insights (per-segment table + action rule)
+                  stats/ segment/ predict/ baskets/ viz/ (Plotly figure functions; v2 adds viz/rules)
 app/Home.py  app/pages/2_Data.py 3_Segmentation.py 4_Prediction.py 5_Recommendation.py 6_Insights.py
 app/components/{data,layout,tour}.py
 artifacts/  (app inputs = contracts.APP_FILES, tracked via the generated .gitignore block; mock/ tracked)
@@ -86,9 +87,9 @@ Stages: ingest → clean → warehouse → features → stats → cube → eda �
 |---|---|---|
 | P1–P5 | data, features + stats, models, 4-page app, polish + deploy prep (= tag v1-full) | done |
 | P6a | simplified backend: 6 features, 3 models, overall rules, demo artifacts (+ review fixes) | done |
-| P6b | 6-page hub-and-spokes app, smoke tests, README app list, DEMO_SCRIPT rewrite | next |
+| P6b | 6-page hub-and-spokes app, smoke tests, README app list, DEMO_SCRIPT rewrite | done |
 
 ## Remaining human TODOs
 1. Deploy on share.streamlit.io: repo AdityaPandya23/retailpulse, branch main, main file app/Home.py,
    Python 3.12; paste the URL into README.md ("Live demo").
-2. Open the live app, confirm there is no "Mock data" badge, rehearse DEMO_SCRIPT.md once (after P6b rewrites it).
+2. Open the live app, confirm there is no "Mock data" badge, rehearse DEMO_SCRIPT.md (v2) once.

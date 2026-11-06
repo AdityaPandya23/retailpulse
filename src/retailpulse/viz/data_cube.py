@@ -788,3 +788,31 @@ def cube_sunburst(
     yr = "all years" if year is None else str(year)
     fig.update_layout(margin={"l": 10, "r": 10, "t": 60, "b": 10})
     return VC.style(fig, f"Drill-down: {label} by country → year → month ({yr})", height=560)
+
+
+# ------------------------------------------------------------------ v2 Data page: raw columns
+# our column -> what one value means (dataset documentation, not data facts)
+RAW_COLUMN_MEANINGS: dict[str, str] = {
+    "invoice": "Invoice number; one invoice = one order ('C' first = a cancellation).",
+    "stock_code": "Product code (5 digits, sometimes + a letter); a few are postage or fees.",
+    "description": "Product name.",
+    "quantity": "Units of the product on this invoice line (negative on cancellations).",
+    "invoice_date": "Date and time of the invoice.",
+    "price": "Price of one unit in pounds sterling (£).",
+    "customer_id": "Customer number; empty for guest checkouts.",
+    "country": "Country where the customer lives.",
+}
+
+
+def raw_columns_table() -> pd.DataFrame:
+    """The 8 raw columns: name in the Excel file, name in this project, meaning."""
+    from retailpulse.ingest import COLUMN_MAP
+
+    excel = {ours: theirs for theirs, ours in COLUMN_MAP.items()}
+    return pd.DataFrame(
+        {
+            "Column (Excel)": [excel.get(c, c) for c in C.RAW_COLUMNS],
+            "Column (here)": list(C.RAW_COLUMNS),
+            "Meaning": [RAW_COLUMN_MEANINGS.get(c, "") for c in C.RAW_COLUMNS],
+        }
+    )

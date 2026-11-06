@@ -28,13 +28,29 @@ explains its own numbers in plain English.
 
 ## The app: 6 pages, "hub and spokes"
 
-1. **Home (live demo):** pick a typical customer of a segment or type 6 values, add products to a
-   basket → their segment on the PCA map, P(return) from the 3 models, and 5 products to offer.
-2. **Data:** the dataset, sample rows, the cleaning funnel, monthly sales, countries, revenue concentration.
-3. **Segmentation:** the 6 features, choosing k (elbow + silhouette), PCA map, segment profiles.
-4. **Prediction:** the time-based split, model comparison (ROC), the Time Machine backtest, KNN bias-variance.
-5. **Recommendation:** support / confidence / lift on a real rule, the top rules, hit-rate vs best sellers.
-6. **Insights:** one row per segment with a suggested action, and the limitations below.
+The Home page is a live demo. Each of its three answer cards links to a page that explains how
+that answer is made. A **Guided Tour** toggle in the sidebar adds numbered notes in demo order.
+
+1. **Home (live demo):** the problem in one line, 4 headline tiles (clean sales lines, customers,
+   revenue, date range) and the pipeline diagram. Click a "Typical …" button (one per segment)
+   or type the 6 numbers, and add products to a basket. Three cards answer:
+   **who is this customer?** (segment badge and a ★ on the PCA map of real customers),
+   **will they come back?** (P(return) from all 3 models with their thresholds, and a verdict from
+   the chosen model), and **what to offer** (top 5 products, each "because you bought X
+   (confidence, lift)" or "best seller").
+2. **Data:** dataset card (source, licence, raw rows, dates), the 8 raw columns, 5 sample rows,
+   the cleaning funnel, monthly sales, revenue concentration (Pareto) and countries.
+3. **Segmentation:** the 6 features, choosing k (elbow + silhouette, chosen k marked), the PCA map
+   (2D or 3D) with a scree chart and what each axis means, segment profile cards, customers % vs
+   revenue % per segment, box plots by segment.
+4. **Prediction:** the out-of-time split, model table and ROC curves for the 3 models, confusion
+   matrix of the chosen model, the Time Machine reveal (what really happened), and KNN train vs
+   test error for k = 1 … 100.
+5. **Recommendation:** support, confidence and lift explained on the strongest rule, the top
+   rules, every rule as a support-vs-confidence bubble, a product picker showing its rules, and
+   the hit-rate of rules vs best sellers.
+6. **Insights:** one row per segment (customers %, revenue %, came back %, mean predicted
+   P(return), top 3 recommended products, suggested action) and the limitations below.
 
 ## Run it locally (Windows; use `source .venv/bin/activate` on macOS / Linux)
 
