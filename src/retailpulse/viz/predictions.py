@@ -23,6 +23,7 @@ from retailpulse.viz import palette as P
 MAX_CURVE_POINTS = 600  # per model: the real PR curves have ~3,000 points each
 OUTCOME_LABELS = ("Did not return", "Returned")
 GBP_TICKS = (1, 10, 100, 1_000, 10_000, 100_000)
+LEGEND_BELOW = {"orientation": "h", "x": 0, "y": -0.2, "yanchor": "top"}
 
 
 # ------------------------------------------------------------------ model / threshold lookup
@@ -251,14 +252,13 @@ def roc_figure(roc: pd.DataFrame | None, cls_metrics: Mapping | None) -> go.Figu
     )
     fig.update_xaxes(range=[0, 1], constrain="domain")
     fig.update_yaxes(range=[0, 1.01], scaleanchor="x", scaleratio=1)
-    # legend in the empty lower-right corner (high FPR, low TPR) keeps the plot wide
-    fig.update_layout(legend={"x": 0.98, "y": 0.02, "xanchor": "right", "yanchor": "bottom"})
+    fig.update_layout(legend=LEGEND_BELOW)  # inside, it covered the chance diagonal
     return VC.style(
         fig,
         title,
         "False positive rate (share of non-returners flagged)",
         "True positive rate (share of returners found)",
-        height=480,
+        height=600,
         legend_title="Model · test ROC-AUC",
     )
 
@@ -305,14 +305,13 @@ def pr_figure(pr: pd.DataFrame | None, cls_metrics: Mapping | None, base_rate: f
         )
     fig.update_xaxes(range=[0, 1])
     fig.update_yaxes(range=[0, 1.01])
-    # legend in the empty lower-left corner (low recall never has low precision here)
-    fig.update_layout(legend={"x": 0.02, "y": 0.02, "xanchor": "left", "yanchor": "bottom"})
+    fig.update_layout(legend=LEGEND_BELOW)  # inside, it covered the no-skill line
     return VC.style(
         fig,
         title,
         "Recall (share of returners found)",
         "Precision (share of flagged who returned)",
-        height=480,
+        height=600,
         legend_title="Model · test PR-AUC (AP)",
     )
 

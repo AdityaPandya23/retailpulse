@@ -309,7 +309,9 @@ def timeline_figure(timeline: pd.DataFrame, cutoff, horizon_days: int | None = N
             text=f"cutoff {cut.date()} ",
             font={"color": P.INK, "size": 12},
         )
-    fig.update_layout(barmode="stack", legend={"orientation": "h", "y": -0.25})
+    fig.update_layout(
+        barmode="stack", legend={"orientation": "h", "y": -0.25, "traceorder": "normal"}
+    )
     y_title = "Revenue per month (£)"
     if VC.is_skewed(t["revenue"]):
         VC.log_axis(fig, "y", y_title)

@@ -256,3 +256,11 @@ def test_cube_sunburst_parents_never_smaller_than_children():
     for parent, total in kids.items():
         assert value[parent] >= total * (1 - 1e-9), parent
     assert value["root/UK"] == pytest.approx(0.12)
+
+
+def test_missing_id_long_negative_bar_label_inside():
+    """Visual pass: an outside label on a long negative bar collided with the y-axis labels."""
+    fig = D.missing_id_effects(_mock_json(C.MISSING_ID_JSON))
+    bar = fig.data[0]
+    for x, pos in zip(bar.x, bar.textposition, strict=True):
+        assert pos == ("inside" if x <= -0.25 else "outside")

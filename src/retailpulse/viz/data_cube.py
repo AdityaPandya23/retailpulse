@@ -158,6 +158,7 @@ def missing_id_effects(missing: dict | None) -> go.Figure:
     if not rows:
         return VC.empty_figure("No missing-ID tests recorded.", "Missing Customer ID")
     labels, values, effects, details = zip(*rows, strict=True)
+    inside = [v <= -0.25 for v in values]  # outside text of a long negative bar hits the y labels
     fig = go.Figure(
         go.Bar(
             x=list(values),
@@ -166,8 +167,9 @@ def missing_id_effects(missing: dict | None) -> go.Figure:
             marker={"color": P.BLUE},
             width=0.5,
             text=[f"{v:+.2f} ({e})" for v, e in zip(values, effects, strict=True)],
-            textposition="outside",
-            textfont={"color": P.INK},
+            textposition=["inside" if i else "outside" for i in inside],
+            insidetextanchor="middle",
+            textfont={"color": [P.SURFACE if i else P.INK for i in inside]},
             cliponaxis=False,
             customdata=np.column_stack([effects, details]),
             hovertemplate="%{y}<br>effect %{x:+.2f} (%{customdata[0]})<br>"
@@ -220,7 +222,7 @@ def format_comparison(fmt: dict | None) -> go.Figure:
             col=col,
         )
     fig.update_yaxes(title_text="Megabytes", row=1, col=1, rangemode="tozero")
-    VC.log_axis(fig, "yaxis2")
+    VC.log_axis(fig, "yaxis2", dtick=1)  # 0.1, 1, 10, 100: no crowded 2 / 5 labels
     fig.update_yaxes(title_text="Seconds (log scale)", row=1, col=2)
     VC.style(fig, "Raw file: Excel vs Parquet", height=340)
     for ann in fig.layout.annotations:  # subplot titles in muted ink
@@ -420,7 +422,7 @@ def pareto_curve(pareto: pd.DataFrame | None, eda: dict | None = None) -> go.Fig
         "Share of revenue",
         height=420,
     )
-    fig.update_layout(legend={"x": 0.98, "y": 0.35, "xanchor": "right"})
+    fig.update_layout(legend={"x": 0.98, "y": 0.2, "xanchor": "right", "yanchor": "bottom"})
     return fig
 
 

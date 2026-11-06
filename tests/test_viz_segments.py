@@ -272,3 +272,23 @@ def test_two_segment_distribution(joined, names):
     assert [t.type for t in fig.data] == ["violin", "violin"]
     assert [t.line.color for t in fig.data] == [P.segment_colour(a), P.segment_colour(b)]
     assert _is_empty_figure(S.two_segment_distribution(joined, 998, 999, "monetary", names))
+
+
+def test_biplot_labels_one_line_apart(segments):
+    """Visual pass: feature labels of arrows pointing the same way overlapped."""
+    load = pd.DataFrame(
+        {
+            "feature": ["monetary", "frequency", "n_distinct_products"],
+            "pc1": [0.5] * 3,
+            "pc2": [0.10, 0.11, 0.12],
+        }
+    )
+    fig = S.pca_biplot(load, segments)
+    ys = sorted(a.y for a in fig.layout.annotations if a.text and not a.showarrow)
+    y_range = segments["pc2"].max() - segments["pc2"].min()
+    assert min(b - a for a, b in zip(ys[:-1], ys[1:], strict=True)) >= 0.05 * y_range
+
+
+def test_parallel_profiles_legend_not_beside_plot(profiles):
+    """Visual pass: a side legend squeezed the half-width plot to ~120 px."""
+    assert S.parallel_profiles(profiles).layout.legend.orientation == "h"

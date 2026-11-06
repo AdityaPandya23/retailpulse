@@ -152,6 +152,11 @@ def pca_scatter_3d(
         },
         margin={"l": 0, "r": 0, "t": 60, "b": 0},
         legend={"itemsizing": "constant"},
+        # camera a bit further away and lower: the PC2 title is not clipped at the bottom
+        scene_camera={
+            "eye": {"x": 1.6, "y": 1.6, "z": 1.0},
+            "center": {"x": 0, "y": 0, "z": -0.15},
+        },
     )
     return fig
 
@@ -167,6 +172,7 @@ def pca_biplot(
         return VC.empty_figure("No PCA loadings.", "PCA biplot")
     fig = go.Figure()
     scale = 1.0
+    y_range = None
     if not _empty(segments) and {"pc1", "pc2"} <= set(segments.columns):
         pts = sample_points(segments, n)
         fig.add_trace(
@@ -183,6 +189,7 @@ def pca_biplot(
         longest = np.nanmax(np.hypot(loadings["pc1"], loadings["pc2"]))
         if np.isfinite(reach) and longest > 0:
             scale = float(reach / longest)
+        y_range = float(np.nanmax(pts["pc2"]) - np.nanmin(pts["pc2"]))
     for _, r in loadings.iterrows():
         x, y = float(r["pc1"]) * scale, float(r["pc2"]) * scale
         fig.add_annotation(
@@ -216,7 +223,7 @@ def pca_biplot(
             ),
         )
     )
-    _label_tips(fig, loadings, scale)
+    _label_tips(fig, loadings, scale, y_range)
     fig.add_hline(y=0, line={"color": P.GREY, "width": 1})
     fig.add_vline(x=0, line={"color": P.GREY, "width": 1})
     note = f" (arrows × {scale:.1f})" if scale != 1.0 else ""
@@ -241,15 +248,23 @@ def _spread(values: np.ndarray, gap: float) -> np.ndarray:
     return out
 
 
-def _label_tips(fig: go.Figure, loadings: pd.DataFrame, scale: float) -> None:
-    """Feature names next to the arrow tips; labels on each side are spread vertically."""
+def _label_tips(
+    fig: go.Figure, loadings: pd.DataFrame, scale: float, y_range: float | None = None
+) -> None:
+    """Feature names next to the arrow tips; labels on each side are spread vertically.
+
+    The gap is a share of the whole plotted y range (≈ one text line at the figure height),
+    so labels of arrows that point the same way do not overlap.
+    """
     x = loadings["pc1"].to_numpy(dtype=float) * scale
     y = loadings["pc2"].to_numpy(dtype=float) * scale
     span = max(float(np.ptp(y)) if len(y) > 1 else 1.0, float(np.abs(y).max()), 1e-9)
+    if y_range is not None and np.isfinite(y_range):
+        span = max(span, y_range)
     y_lab = y.copy()
     for side in (x >= 0, x < 0):
         if side.any():
-            y_lab[side] = _spread(y[side], gap=0.09 * span)
+            y_lab[side] = _spread(y[side], gap=0.06 * span)
     for f, xi, yl in zip(loadings["feature"], x, y_lab, strict=True):
         fig.add_annotation(
             x=xi,
@@ -525,8 +540,21 @@ def parallel_profiles(
         "Segment means across features (scaled per feature)",
         "Feature",
         "Scaled segment mean",
-        height=440,
+        height=540,
         legend_title="Segment",
+    )
+    fig.update_xaxes(tickangle=-35)
+    # legend at the bottom of the figure (a side legend squeezes the half-width plot)
+    fig.update_layout(
+        legend={
+            "orientation": "h",
+            "x": 0,
+            "y": 0,
+            "yref": "container",
+            "yanchor": "bottom",
+            "title_text": "",
+        },
+        margin={"b": 200},
     )
     return fig
 
@@ -808,7 +836,7 @@ def histogram_polygon(hist: pd.DataFrame | None, feature: str) -> go.Figure:
     if log:
         ticks = np.arange(np.floor(left.min()), np.ceil(right.max()) + 1)
         fig.update_xaxes(tickvals=ticks, ticktext=[f"{10**t:,.0f}" for t in ticks])
-    fig.update_layout(legend={"x": 0.98, "y": 0.98, "xanchor": "right"}, bargap=0)
+    fig.update_layout(legend={"orientation": "h", "x": 0, "y": 1.02, "yanchor": "bottom"}, bargap=0)
     return fig
 
 
