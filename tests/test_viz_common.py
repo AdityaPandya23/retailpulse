@@ -52,3 +52,8 @@ def test_style_sets_the_template_on_the_figure():
     assert fig.layout.title.text == "Title" and fig.layout.xaxis.title.text == "x (£)"
     assert VC.money(1234.5) == "£1,234" and VC.money(17_370_000) == "£17.4M"
     assert VC.pct(0.253, 1) == "25.3%"
+
+
+def test_num_formats_none_and_nan_as_na():
+    assert VC.num(None) == "n/a" and VC.num(float("nan"), ".1f") == "n/a"
+    assert VC.num(1234.567, ",.1f") == "1,234.6" and VC.num(2e-6, ".2g") == "2e-06"

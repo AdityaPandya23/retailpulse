@@ -9,6 +9,7 @@ from components import data, layout, tour
 
 from retailpulse import contracts as C
 from retailpulse.viz import segments as S
+from retailpulse.viz.common import num
 
 layout.setup_page("Segments & Stats")
 layout.page_header(
@@ -21,6 +22,7 @@ layout.page_header(
 seg = data.metrics("segment")
 stats = data.metrics("stats")
 names = data.segment_names()
+horizon = data.metrics("features").get("horizon_days", 90)
 segments = data.table(C.SEGMENTS_PARQUET)
 profiles = data.table(C.SEGMENT_PROFILES_PARQUET)
 features = data.table(C.FEATURES_CUTOFF_PARQUET)
@@ -153,7 +155,7 @@ with tab_valid:
     st.caption(
         "Same scaled features for both. The RFM baseline groups customers by their recency, "
         "frequency and monetary quartiles; ROC-AUC (5-fold CV ± sd) asks how well the group "
-        "alone predicts who buys again in the next 90 days."
+        f"alone predicts who buys again in the next {horizon} days."
     )
     layout.conclusion(baseline.get("conclusion"))
 
@@ -162,18 +164,18 @@ with tab_valid:
     col_chi, col_bar = st.columns([1, 2])
     with col_chi:
         if chi2:
-            layout.kpi_row([{"label": "χ²", "value": f"{chi2.get('chi2', float('nan')):,.1f}"}])
+            layout.kpi_row([{"label": "χ²", "value": num(chi2.get("chi2"), ",.1f")}])
             layout.kpi_row(
                 [
                     {"label": "dof", "value": str(chi2.get("dof", "n/a"))},
-                    {"label": "p-value", "value": f"{chi2.get('p_value', float('nan')):.2g}"},
+                    {"label": "p-value", "value": num(chi2.get("p_value"), ".2g")},
                 ]
             )
             layout.kpi_row(
                 [
                     {
                         "label": "Cramér's V",
-                        "value": f"{chi2.get('cramers_v', float('nan')):.2f}",
+                        "value": num(chi2.get("cramers_v"), ".2f"),
                         "help": "0 = no association, 1 = perfect; < 0.1 is negligible.",
                     }
                 ]
@@ -270,7 +272,7 @@ with tab_live:
                 [
                     {
                         "label": f"{name}: n · median",
-                        "value": f"{g.get('n', 0):,} · {g.get('median', float('nan')):,.1f}",
+                        "value": f"{g.get('n', 0):,} · {num(g.get('median'), ',.1f')}",
                     }
                     for name, g in groups.items()
                 ]

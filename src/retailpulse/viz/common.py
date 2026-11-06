@@ -111,6 +111,15 @@ def money(x: float, decimals: int = 0) -> str:
     return f"£{x:,.{decimals}f}"
 
 
+def num(x, spec: str = ",.2f") -> str:
+    """Format a metrics number; None (NaN is stored as null in metrics.json) / NaN -> "n/a"."""
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return "n/a"
+    return format(v, spec) if np.isfinite(v) else "n/a"
+
+
 def pct(x: float, decimals: int = 0) -> str:
     if x is None or not np.isfinite(x):
         return "n/a"

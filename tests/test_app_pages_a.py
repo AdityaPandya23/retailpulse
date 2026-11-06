@@ -110,3 +110,27 @@ def test_segments_tour_callouts(run_app_page):
     at.sidebar.toggle(key="tour_toggle").set_value(True).run()
     assert not at.exception
     assert sum("Tour" in i.value for i in at.info) == 4
+
+
+def test_pages_survive_null_metrics(run_app_page, tmp_path, monkeypatch):
+    """Regression (P4 review): NaN is stored as null in metrics.json; chi-square / Gini tiles
+    must show "n/a" instead of crashing on format(None)."""
+    import json
+
+    from retailpulse import contracts as C
+
+    mock = C.read_metrics(C.mock_path(C.METRICS_JSON))
+    seg, eda = dict(mock["segment"]), dict(mock["eda"])
+    seg["chi2_segment_uk"] = {
+        **seg["chi2_segment_uk"],
+        "chi2": None,
+        "p_value": None,
+        "cramers_v": None,
+    }
+    eda["gini"] = None
+    (tmp_path / "metrics.json").write_text(json.dumps({"segment": seg, "eda": eda}))
+    monkeypatch.setenv("RETAILPULSE_ARTIFACTS", str(tmp_path))  # files fall back to mock
+    for page, label in ((PAGE_2, "Cramér's V"), (PAGE_1, "Gini of customer revenue")):
+        at = run_app_page(page)
+        assert not at.exception, at.exception
+        assert next(m for m in at.metric if m.label == label).value == "n/a"

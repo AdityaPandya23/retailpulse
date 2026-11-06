@@ -673,6 +673,25 @@ def cube_dice_heatmap(
     )
 
 
+def _values_from_children(ids: list[str], parents: list[str], values: list[float]) -> list[float]:
+    """Parent value = sum of its children (leaves keep theirs); children must follow parents.
+
+    branchvalues="total" makes plotly.js drop the whole chart when a parent is smaller than
+    the sum of its children (tolerance 1e-6). Each grouping-set row is rounded to pennies on
+    its own, so a parent's own row can fall a few pence short of its rounded children.
+    """
+    pos = {node: n for n, node in enumerate(ids)}
+    total, child_sum, has_child = list(values), [0.0] * len(ids), [False] * len(ids)
+    for n in range(len(ids) - 1, -1, -1):
+        if has_child[n]:
+            total[n] = child_sum[n]
+        if parents[n]:
+            p = pos[parents[n]]
+            child_sum[p] += total[n]
+            has_child[p] = True
+    return total
+
+
 def cube_sunburst(
     cube: pd.DataFrame | None,
     measure: str = "revenue",
@@ -681,8 +700,9 @@ def cube_sunburst(
 ) -> go.Figure:
     """Drill-down country -> year -> month; every ring is read from its own grouping set.
 
-    Sizes use an additive measure (revenue or orders); hover shows the exact distinct
-    customers of each node from its own rolled-up row. The UK branch is blue (labelled),
+    Sizes use an additive measure (revenue or orders), summed up from the finest ring so
+    parents always equal their children; hover shows the exact distinct customers of each
+    node from its own rolled-up row (customers are never summed). The UK branch is blue (labelled),
     other countries grey - the same highlight as the country bar chart.
     """
     if measure not in ADDITIVE_MEASURES:
@@ -739,6 +759,7 @@ def cube_sunburst(
         values.append(float(r[measure]))
         custs.append(int(r["customers"]))
         colours.append(colour(r["country"], 2))
+    values = _values_from_children(ids, parents, values)
 
     fmt = "£%{value:,.0f}" if measure == "revenue" else "%{value:,.0f} orders"
     text_colours = [P.SURFACE if c == _rgba(HIGHLIGHT_COLOUR, 1.0) else P.INK for c in colours]

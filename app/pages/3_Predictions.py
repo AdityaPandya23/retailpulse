@@ -16,9 +16,11 @@ from retailpulse.viz.common import pct
 REVEAL_KEY = "tm_revealed"
 
 layout.setup_page("Predictions")
+feats = data.metrics("features")
+horizon = feats.get("horizon_days", 90)
 layout.page_header(
     "Predictions",
-    "B · Who will come back in the 90 days after the cutoff?",
+    f"B · Who will come back in the {horizon} days after the cutoff?",
     "Five classifiers were trained on an earlier snapshot and judged on the future window "
     "(out-of-time split). The model is chosen on train cross-validation only.",
 )
@@ -26,7 +28,6 @@ layout.page_header(
 cls = data.metrics("classify")
 reg = data.metrics("regress")
 bt = data.metrics("backtest")
-feats = data.metrics("features")
 classification = data.table(C.CLASSIFICATION_PARQUET)
 
 if classification is None or classification.empty:
@@ -35,7 +36,6 @@ if classification is None or classification.empty:
 
 best = VP.best_model(cls, classification)
 cutoff = cls.get("test_cutoff") or feats.get("cutoff") or "the cutoff"
-horizon = feats.get("horizon_days", 90)
 
 
 # cached wrappers around pure src functions (args hashed once per rerun; frames are small)

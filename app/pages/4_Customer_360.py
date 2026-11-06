@@ -240,7 +240,8 @@ if feat_row is None or not columns or live_actual is None:
     st.stop()
 
 specs = _specs(features, cid, tuple(columns))
-if st.session_state.get(WHATIF_FOR) != cid:
+keys = [slider_key(s["feature"]) for s in specs]
+if VCu.sliders_need_fill(st.session_state, keys, cid, st.session_state.get(WHATIF_FOR)):
     _fill_sliders(specs, cid)
 
 tour.callout(

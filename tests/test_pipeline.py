@@ -3,6 +3,7 @@ import os
 import numpy as np
 
 from retailpulse import contracts as C
+from retailpulse.config import CONFIG_PATH
 from retailpulse.pipeline import STAGES, Stage, up_to_date
 
 
@@ -56,6 +57,8 @@ def test_p2_parquet_outputs_are_registered_contracts():
                 assert path in C.PARQUET_CONTRACTS, path
     mock = next(s for s in STAGES if s.name == "mock")
     assert set(mock.outputs) == set(C.MOCK_OUTPUTS)
+    # regression (P4 review): mock uses CUTOFF / HORIZON_DAYS -> rebuilt when config changes
+    assert CONFIG_PATH in mock.inputs
 
 
 def test_mock_path():

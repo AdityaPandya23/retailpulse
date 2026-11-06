@@ -218,7 +218,8 @@ STAGES: list[Stage] = [
         ("eda",),
         inputs=(C.FEATURES_FULL_PARQUET, C.SALES_PARQUET),
     ),
-    Stage("mock", run_mock, C.MOCK_OUTPUTS),  # synthetic: depends only on code + seed
+    # synthetic, but the mock timeline / recommendations / features use the cutoff + horizon
+    Stage("mock", run_mock, C.MOCK_OUTPUTS, inputs=(CONFIG_PATH,)),
     # ---- P3 models (k / names / hyper-parameters live in config.yaml) ----
     Stage(
         "segment",

@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from retailpulse import contracts as C
+from retailpulse.config import HORIZON_DAYS
 from retailpulse.predict.backtest import decile_table
 from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
@@ -428,7 +429,9 @@ def confusion_figure(test: pd.DataFrame, model: str | None, threshold: float | N
             )
     fig.update_yaxes(autorange="reversed", showgrid=False)
     fig.update_xaxes(showgrid=False, side="bottom")
-    return VC.style(fig, title, "Prediction", "Actual outcome in the 90 days", height=380)
+    return VC.style(
+        fig, title, "Prediction", f"Actual outcome in the {HORIZON_DAYS} days", height=380
+    )
 
 
 # ------------------------------------------------------------------ KNN bias-variance
@@ -636,8 +639,8 @@ def pred_vs_actual_figure(regression: pd.DataFrame | None, model: str | None) ->
     return VC.style(
         fig,
         title,
-        "Predicted 90-day spend (£, log scale)",
-        "Actual 90-day spend (£, log scale)",
+        f"Predicted {HORIZON_DAYS}-day spend (£, log scale)",
+        f"Actual {HORIZON_DAYS}-day spend (£, log scale)",
         height=440,
     )
 
@@ -671,7 +674,7 @@ def residual_figure(regression: pd.DataFrame | None, model: str | None) -> go.Fi
     return VC.style(
         fig,
         title,
-        "Predicted 90-day spend (£, log scale)",
+        f"Predicted {HORIZON_DAYS}-day spend (£, log scale)",
         "Residual: log1p(actual) − log1p(predicted)",
         height=440,
     )

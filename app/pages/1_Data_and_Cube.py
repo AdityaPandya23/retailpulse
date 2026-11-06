@@ -7,7 +7,7 @@ from components import data, layout, tour
 
 from retailpulse import contracts as C
 from retailpulse.viz import data_cube as D
-from retailpulse.viz.common import money, pct
+from retailpulse.viz.common import money, num, pct
 
 layout.setup_page("Data & Cube")
 layout.page_header(
@@ -125,7 +125,7 @@ with tab_customers:
         layout.chart(D.country_revenue(data.table(C.EDA_COUNTRIES_PARQUET)), key="p1_countries")
     layout.kpi_row(
         [
-            {"label": "Gini of customer revenue", "value": f"{eda.get('gini', float('nan')):.2f}"},
+            {"label": "Gini of customer revenue", "value": num(eda.get("gini"), ".2f")},
             {
                 "label": "Top 1% of customers",
                 "value": pct(eda.get("top_1pct_revenue_share", float("nan"))),

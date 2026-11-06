@@ -236,3 +236,24 @@ def test_recommendations_fewer_than_five_none_and_no_reasons(mock):
     cid = int(counts.index[0])
     t = VCu.recommendation_table(recs.drop(columns="source"), None, cid)
     assert len(t) == counts[cid] and t["Confidence"].isna().all()
+
+
+def test_sliders_need_fill_on_new_customer_or_lost_widget_state():
+    """Regression (P4 review): refill after a page switch drops the slider keys."""
+    keys = ["c360_whatif_recency", "c360_whatif_frequency"]
+    full = dict.fromkeys(keys, 1)
+    assert not VCu.sliders_need_fill(full, keys, 7, 7)
+    assert VCu.sliders_need_fill(full, keys, 7, 8)  # other customer
+    assert VCu.sliders_need_fill({"c360_whatif_recency": 1}, keys, 7, 7)  # state dropped
+
+
+def test_figure_labels_follow_configured_horizon(monkeypatch):
+    """Regression (P4 review): labels used a fixed '90 days' instead of config horizon_days."""
+    from retailpulse.viz import predictions as VP
+
+    monkeypatch.setattr(VCu, "HORIZON_DAYS", 60)
+    monkeypatch.setattr(VP, "HORIZON_DAYS", 60)
+    assert "within 60 days" in VCu.gauge_figure(0.4, 0.37, "knn").layout.title.text
+    test = pd.DataFrame({"returned_flag": [0, 1, 1], "pred_return": [0, 1, 0]})
+    fig = VP.confusion_figure(test, "knn", 0.37)
+    assert fig.layout.yaxis.title.text == "Actual outcome in the 60 days"

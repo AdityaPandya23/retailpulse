@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 from retailpulse import contracts as C
@@ -86,3 +88,28 @@ def test_customer_360_without_recommendations(run_app_page):
     at.selectbox(key="c360_customer").set_value(int(none)).run()
     assert not at.exception, at.exception
     assert any("No recommendations" in i.value for i in at.info)
+
+
+def test_customer_360_sliders_refilled_after_visiting_another_page(mock_artifacts):
+    """Regression (P4 review): Streamlit drops widget state on a page switch; coming back to
+    the SAME customer must refill the What-if sliders with the real values, not their minimum
+    (and the What-if deltas must start at 0 again)."""
+    from streamlit.testing.v1 import AppTest
+
+    home = Path(__file__).resolve().parents[1] / "app" / "Home.py"
+    at = AppTest.from_file(str(home), default_timeout=120)
+    at.run()
+    at.switch_page(C360).run()
+    assert not at.exception, at.exception
+    cid = at.selectbox(key="c360_customer").value
+    feats = pd.read_parquet(C.mock_path(C.FEATURES_CUTOFF_PARQUET))
+    expected = int(feats.loc[feats["customer_id"] == cid, "recency"].iloc[0])
+    assert at.slider(key="c360_whatif_recency").value == expected
+    at.switch_page(PRED).run()
+    assert not at.exception, at.exception
+    at.switch_page(C360).run()
+    assert not at.exception, at.exception
+    assert at.selectbox(key="c360_customer").value == cid
+    assert at.slider(key="c360_whatif_recency").value == expected
+    p = next(m for m in at.metric if m.label.startswith("P(buys again)"))
+    assert p.delta.startswith("+0.0 pp")

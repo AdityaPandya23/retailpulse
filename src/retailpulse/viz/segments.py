@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from retailpulse import contracts as C
-from retailpulse.config import SEED
+from retailpulse.config import HORIZON_DAYS, SEED
 from retailpulse.stats.tests import compare_groups, fmt_p
 from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
@@ -415,7 +415,9 @@ def profile_cards(profiles: pd.DataFrame | None, names: Mapping[int, str] | None
             ("Revenue share", VC.pct(_num(r["revenue_share"]))),
         ]
         if "bought_again_share" in p.columns:
-            lines.append(("Bought again (90 days)", VC.pct(_num(r["bought_again_share"]))))
+            lines.append(
+                (f"Bought again ({HORIZON_DAYS} days)", VC.pct(_num(r["bought_again_share"])))
+            )
         lines += [
             ("Mean recency", f"{_num(r['recency']):,.0f} days"),
             ("Mean frequency", f"{_num(r['frequency']):,.1f} orders"),

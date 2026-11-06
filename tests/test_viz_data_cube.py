@@ -220,3 +220,39 @@ def test_cube_dice_reads_the_right_grouping_set(cube):
     assert list(table["country"]) == sorted(
         table["country"], key=lambda c: -table.set_index("country").loc[c, "revenue"]
     )
+
+
+def _rounded_cube() -> pd.DataFrame:
+    """One country, one year, 12 months of £0.004 each: every row rounded to pennies on its
+    own (like cube.py) -> months 12 x £0.01 = £0.12 but the year / country rows only £0.05."""
+    rows = []
+    for gid, country, year, month, revenue in [(0, "UK", 2010, m, 0.01) for m in range(1, 13)] + [
+        (1, "UK", 2010, None, 0.05),
+        (3, "UK", None, None, 0.05),
+    ]:
+        rows.append(
+            {
+                "country": country,
+                "year": year,
+                "month": month,
+                "grouping_id": gid,
+                "level": "x",
+                "revenue": revenue,
+                "orders": 1,
+                "customers": 1,
+            }
+        )
+    return pd.DataFrame(rows, columns=C.CUBE_COLUMNS)
+
+
+def test_cube_sunburst_parents_never_smaller_than_children():
+    """Regression (P4 review): branchvalues="total" breaks when a parent < sum(children)."""
+    sb = D.cube_sunburst(_rounded_cube(), "revenue").data[0]
+    value = dict(zip(sb.ids, sb.values, strict=True))
+    kids: dict[str, float] = {}
+    for node, parent in zip(sb.ids, sb.parents, strict=True):
+        if parent:
+            kids[parent] = kids.get(parent, 0.0) + value[node]
+    for parent, total in kids.items():
+        assert value[parent] >= total * (1 - 1e-9), parent
+    assert value["root/UK"] == pytest.approx(0.12)

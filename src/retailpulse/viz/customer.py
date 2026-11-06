@@ -18,6 +18,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from retailpulse import contracts as C
+from retailpulse.config import HORIZON_DAYS
 from retailpulse.segment.cluster import predict_segment
 from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
@@ -231,6 +232,13 @@ def slider_specs(features: pd.DataFrame, row: pd.Series, columns: list[str]) -> 
     return specs
 
 
+def sliders_need_fill(state: Mapping, keys: list[str], cid, filled_for) -> bool:
+    """Refill the What-if sliders when the customer changed OR any slider key is gone:
+    Streamlit drops widget state when the user visits another page, and a slider without
+    state would start at its minimum instead of the customer's real value."""
+    return filled_for != cid or any(k not in state for k in keys)
+
+
 def raw_frame(
     values: Mapping[str, float], base: pd.Series | None, columns: list[str]
 ) -> pd.DataFrame:
@@ -311,7 +319,7 @@ def timeline_figure(timeline: pd.DataFrame, cutoff, horizon_days: int | None = N
 
 def gauge_figure(p: float | None, threshold: float | None, model: str | None) -> go.Figure:
     """Return-probability gauge (0-100%) in the model's colour, threshold as an ink tick."""
-    title = f"Chance of buying again within 90 days · {model}"
+    title = f"Chance of buying again within {HORIZON_DAYS} days · {model}"
     if p is None or not np.isfinite(p):
         return VC.empty_figure("No prediction for this customer.", title)
     colour = P.model_colour(model or "")

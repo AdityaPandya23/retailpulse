@@ -22,6 +22,7 @@ seg = data.metrics("segment")
 cls = data.metrics("classify")
 bt = data.metrics("backtest")
 rules = data.metrics("rules")
+horizon = feats.get("horizon_days", 90)
 names = data.segment_names()
 
 best = cls.get("best_model")
@@ -78,7 +79,9 @@ layout.kpi_row(
             "label": "… of whom actually came back",
             "value": pct(bt.get("share_actually_returned", float("nan"))),
             "delta": f"vs {pct(bt.get('base_rate', float('nan')))} of all customers",
-            "help": "Precision of the 'will return' prediction in the 90 days after the cutoff.",
+            "help": (
+                f"Precision of the 'will return' prediction in the {horizon} days after the cutoff."
+            ),
         },
         {
             "label": "Recommendations hit-rate @5",
@@ -120,7 +123,7 @@ with qa, st.container(border=True):
 with qb, st.container(border=True):
     st.markdown("#### B · Who will come back?")
     st.markdown(
-        "Five classifiers predict 'buys again within 90 days' on an out-of-time split; "
+        f"Five classifiers predict 'buys again within {horizon} days' on an out-of-time split; "
         "a Time Machine backtest compares the predictions with what really happened."
     )
     st.page_link("pages/3_Predictions.py", label="Predictions", icon=":material/insights:")
