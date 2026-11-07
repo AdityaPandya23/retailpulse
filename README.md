@@ -26,31 +26,27 @@ tenure, average basket value and number of distinct products.
 All numbers come from `artifacts/metrics.json`. The app reads them live, and each page
 explains its own numbers in plain English.
 
-## The app: 6 pages, "hub and spokes"
+## The app: 4 pages
 
-The Home page is a live demo. Each of its three answer cards links to a page that explains how
-that answer is made. A **Guided Tour** toggle in the sidebar adds numbered notes in demo order.
+Overview first, then the live demo; each demo card links to a page that explains how that
+answer is made. A **Dark mode / Light mode** button in the sidebar switches the theme.
+Recommendation and Insights pages are hidden for the demo (code kept in `app/hidden_pages/`).
 
-1. **Home (live demo):** the problem in one line, 4 headline tiles (clean sales lines, customers,
-   revenue, date range) and the pipeline diagram. Click a "Typical …" button (one per segment)
-   or type the 6 numbers, and add products to a basket. Three cards answer:
-   **who is this customer?** (segment badge and a ★ on the PCA map of real customers),
-   **will they come back?** (P(return) from all 3 models with their thresholds, and a verdict from
-   the chosen model), and **what to offer** (top 5 products, each "because you bought X
-   (confidence, lift)" or "best seller").
-2. **Data:** dataset card (source, licence, raw rows, dates), the 8 raw columns, 5 sample rows,
-   the cleaning funnel, monthly sales, revenue concentration (Pareto) and countries.
-3. **Segmentation:** the 6 features, choosing k (elbow + silhouette, chosen k marked), the PCA map
-   (2D or 3D) with a scree chart and what each axis means, segment profile cards, customers % vs
+1. **Home (overview):** the problem in one line, 4 headline tiles (clean sales lines, customers,
+   revenue, date range), the pipeline diagram, then the dataset: card (source, licence, raw rows,
+   dates), the 8 raw columns, 5 sample rows, the cleaning funnel, monthly sales, revenue
+   concentration (Pareto) and countries.
+2. **Demo:** click a "Typical …" button (one per segment) or type the 6 numbers and press
+   **Enter**. Two cards answer **who is this customer?** (segment badge and a ★ on the 2D PCA
+   map of real customers) and **will they come back?** (P(return) from all 3 models with their
+   thresholds, and a verdict from the chosen model), followed by 2-3 lines of insight for this
+   customer (segment return rate, what the verdict means, suggested action).
+3. **Segmentation:** the 6 features, choosing k (elbow + silhouette, chosen k marked), the 2D PCA
+   map with a scree chart and what each axis means, segment profile cards, customers % vs
    revenue % per segment, box plots by segment.
 4. **Prediction:** the out-of-time split, model table and ROC curves for the 3 models, confusion
-   matrix of the chosen model, the Time Machine reveal (what really happened), and KNN train vs
+   matrix of the chosen model, the Time Machine outcome (what really happened), and KNN train vs
    test error for k = 1 … 100.
-5. **Recommendation:** support, confidence and lift explained on the strongest rule, the top
-   rules, every rule as a support-vs-confidence bubble, a product picker showing its rules, and
-   the hit-rate of rules vs best sellers.
-6. **Insights:** one row per segment (customers %, revenue %, came back %, mean predicted
-   P(return), top 3 recommended products, suggested action) and the limitations below.
 
 ## Run it locally (Windows; use `source .venv/bin/activate` on macOS / Linux)
 

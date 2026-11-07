@@ -137,11 +137,7 @@ def kpi_facts(warehouse: Mapping | None, cleaning: Mapping | None, fmt: Mapping 
 def pipeline_dot(
     models: Sequence[str] = tuple(C.CLASSIFIERS), n_features: int = len(DEMO_FEATURES)
 ) -> str:
-    """Graphviz DOT of the pipeline: Raw Excel -> Clean -> Features -> models -> Dashboard.
-
-    Association rules are mined from the cleaned invoices (baskets), not from the customer
-    features, so that arrow starts at Clean.
-    """
+    """Graphviz DOT of the pipeline: Raw Excel -> Clean -> Features -> models -> Dashboard."""
     model_list = " · ".join(models)
     return "\n".join(
         [
@@ -155,11 +151,10 @@ def pipeline_dot(
             f'  feats [label="Features\\n({n_features} per customer,\\nbefore the cutoff)"];',
             '  kmeans [label="K-Means\\nsegments"];',
             f'  cls [label="{len(models)} classifiers\\n{model_list}"];',
-            '  rules [label="Association rules\\n(baskets)"];',
             '  app [label="Dashboard\\n(this app)", fillcolor="#FFFFFF"];',
             "  raw -> clean -> feats;",
-            "  feats -> kmeans; feats -> cls; clean -> rules;",
-            "  kmeans -> app; cls -> app; rules -> app;",
+            "  feats -> kmeans; feats -> cls;",
+            "  kmeans -> app; cls -> app;",
             "}",
         ]
     )
@@ -224,6 +219,51 @@ def verdict(probs: pd.DataFrame, horizon_days: int = HORIZON_DAYS) -> dict:
         "n_agree": agree,
         "text": text,
     }
+
+
+# ------------------------------------------------------------------ insights for one request
+def request_insights(
+    segment_id: int | None,
+    segment_name: str | None,
+    answer: Mapping,
+    n_models: int,
+    actions: Mapping[int, tuple[str, str]] | None = None,
+    came_back: Mapping[int, float] | None = None,
+    horizon_days: int = HORIZON_DAYS,
+) -> list[str]:
+    """2-3 plain markdown lines on what the two answers mean for this one customer."""
+    lines = []
+    if segment_id is not None:
+        name = md_escape(segment_name or f"segment {segment_id}")
+        share = (came_back or {}).get(segment_id)
+        lines.append(
+            f"Looks like a typical **{name}** customer (segment {segment_id})"
+            + (
+                f": {share:.0%} of that segment bought again within {horizon_days} days."
+                if share is not None
+                else "."
+            )
+        )
+    if answer.get("will_return") is not None:
+        p, model = answer["p_return"], answer["model"]
+        line = (
+            f"The chosen model ({model}) expects them back ({p:.0%}): keep them engaged, "
+            "no discount needed"
+            if answer["will_return"]
+            else f"The chosen model ({model}) does not expect them back ({p:.0%}): send a "
+            "reminder or a win-back email now"
+        )
+        agree = int(answer.get("n_agree") or 0)
+        line += (
+            f"; all {n_models} models agree, so the answer is solid."
+            if agree == n_models
+            else f"; only {agree} of {n_models} models agree, so treat it as a borderline case."
+        )
+        lines.append(line)
+    action = (actions or {}).get(segment_id) if segment_id is not None else None
+    if action:
+        lines.append(f"Suggested action for this segment: **{action[0]}** ({action[1]}).")
+    return lines
 
 
 # ------------------------------------------------------------------ what to offer

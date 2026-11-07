@@ -211,6 +211,18 @@
   exactly 35% with 1 of 3 models agreeing, so the script warns about borderline customers instead.
 - README changed only in the test lines (no number or page description changed). Next: human items below.
 
+## P6d Demo layout changes — done (2026-11-07)
+- Home = overview (4 tiles) + pipeline (always visible, rules node removed) + all of the old Data page.
+- New pages/2_Demo.py: presets + 6 inputs in a form with an **Enter** button (results update only on
+  Enter or a preset click); 2 cards (segment + 2D PCA map, P(return)); "Insights for this customer"
+  (demo.request_insights: segment return rate, verdict meaning + model agreement, suggested action).
+- Recommendation hidden everywhere (card, basket, links, pipeline node); 5_Recommendation and 6_Insights
+  moved to app/hidden_pages/ (not discovered by Streamlit). Limitations no longer shown in the app.
+- Segmentation: 2D PCA only (3D toggle removed). Prediction: Time Machine outcome always visible.
+- Guided Tour toggle removed (callouts stay off). Sidebar Dark/Light button: sets theme.base at runtime
+  (st._config.set_option + rerun, server-wide); layout.chart recolours figure text/grid/surface for dark.
+- Checked: AppTest on real artifacts, 4 pages × light/dark, 0 exceptions. Tests: 292 pass; ruff clean.
+
 ## Open items (human)
 1. Push the tag so README's v1 link works: `git push origin v1-full`.
 2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.

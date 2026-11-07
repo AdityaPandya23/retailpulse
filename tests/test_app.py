@@ -15,18 +15,12 @@ import pytest
 
 from retailpulse import contracts as C
 from retailpulse import demo
-from retailpulse.viz import rules as VR
 
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
 
-PAGES = [
-    "pages/2_Data.py",
-    "pages/3_Segmentation.py",
-    "pages/4_Prediction.py",
-    "pages/5_Recommendation.py",
-    "pages/6_Insights.py",
-]
-CARD_TITLES = ("#### Who is this customer?", "#### Will they come back?", "#### What to offer")
+DEMO = "pages/2_Demo.py"
+PAGES = [DEMO, "pages/3_Segmentation.py", "pages/4_Prediction.py"]
+CARD_TITLES = ("#### Who is this customer?", "#### Will they come back?")
 
 
 def _markdown(at) -> str:
@@ -37,17 +31,62 @@ def _mock_metrics() -> dict:
     return C.read_metrics(C.mock_path(C.METRICS_JSON))
 
 
-def test_home_runs_on_mock(run_app_page):
+def _demo(run_app_page):
+    at = run_app_page("Home.py")
+    at.switch_page(DEMO).run()
+    assert not at.exception, at.exception
+    return at
+
+
+def test_home_overview_runs_on_mock(run_app_page):
     at = run_app_page("Home.py")
     assert not at.exception, at.exception
     assert any("Mock data" in w.value for w in at.sidebar.warning)
-    assert len(at.metric) == 4  # clean rows, customers, revenue, date range
+    assert len(at.metric) == 8  # 4 headline numbers + 4 on the dataset card
+    assert at.get("graphviz_chart")  # pipeline always visible (no expander)
+    assert not at.main.expander
+    assert not at.toggle  # no Guided Tour
+    assert [b.key for b in at.sidebar.button] == ["theme_toggle"]
+
+
+def test_demo_runs_on_mock(run_app_page):
+    at = _demo(run_app_page)
     text = _markdown(at)
     assert all(t in text for t in CARD_TITLES)
+    assert "What to offer" not in text and not at.multiselect  # recommendation hidden
     assert "Mock segment" in text  # segment badge names come from the artifacts
+    assert "Suggested action for this segment" in text  # insights for this request
     assert len(at.number_input) == 6
     names = _mock_metrics()["segment"]["segment_names"]
-    assert [b.label for b in at.button] == [f"Typical {n}" for n in names.values()]
+    presets = [b.label for b in at.button if (b.key or "").startswith("preset_")]
+    assert presets == [f"Typical {n}" for n in names.values()]
+
+
+def test_demo_enter_applies_typed_numbers(run_app_page):
+    at = _demo(run_app_page)
+    at.number_input(key="demo_in_recency").set_value(321).run()
+    assert not any("your own numbers" in c.value for c in at.caption)  # not applied yet
+    at.number_input(key="demo_in_recency").set_value(321)
+    at.button(key="demo_enter").click().run()
+    assert not at.exception, at.exception
+    assert any("your own numbers" in c.value for c in at.caption)
+
+
+def test_theme_button_switches_to_dark_and_back(run_app_page):
+    import streamlit as st
+
+    at = run_app_page("Home.py")
+    try:
+        at.sidebar.button(key="theme_toggle").click().run()
+        assert not at.exception, at.exception
+        assert st.get_option("theme.base") == "dark"
+        assert at.sidebar.button(key="theme_toggle").label == "Light mode"
+        at.switch_page(DEMO).run()  # charts recoloured without errors
+        assert not at.exception, at.exception
+        at.sidebar.button(key="theme_toggle").click().run()
+        assert st.get_option("theme.base") == "light"
+    finally:
+        st._config.set_option("theme.base", "light")
 
 
 def test_home_then_every_page_runs_on_mock(run_app_page):
@@ -60,8 +99,7 @@ def test_home_then_every_page_runs_on_mock(run_app_page):
 
 
 def test_preset_button_fills_inputs_and_cards_render(run_app_page):
-
-    at = run_app_page("Home.py")
+    at = _demo(run_app_page)
     presets = pd.read_parquet(C.mock_path(C.SEGMENT_PRESETS_PARQUET))
     sid = int(presets["segment"].max())  # not the default (first) segment
     at.button(key=f"preset_{sid}").click().run()
@@ -72,27 +110,24 @@ def test_preset_button_fills_inputs_and_cards_render(run_app_page):
     text = _markdown(at)
     assert all(t in text for t in CARD_TITLES)
     assert "come back** within" in text  # verdict of the chosen model
-    assert sum("best seller" in m.value or "because you bought" in m.value for m in at.markdown)
     assert len(at.get("plotly_chart")) == 2  # PCA map + P(return) bars
 
 
-def test_home_inputs_survive_a_page_switch(run_app_page):
-    at = run_app_page("Home.py")
-    at.number_input(key="demo_in_recency").set_value(321).run()
-    at.switch_page("pages/2_Data.py").run()
+def test_demo_inputs_survive_a_page_switch(run_app_page):
+    at = _demo(run_app_page)
+    at.number_input(key="demo_in_recency").set_value(321)
+    at.button(key="demo_enter").click().run()
     at.switch_page("Home.py").run()
+    at.switch_page(DEMO).run()
     assert not at.exception, at.exception
     assert at.number_input(key="demo_in_recency").value == 321
 
 
-def test_prediction_reveal_and_knn_slider(run_app_page):
+def test_prediction_outcome_visible_and_knn_slider(run_app_page):
     at = run_app_page("Home.py")
     at.switch_page("pages/4_Prediction.py").run()
     assert not at.exception, at.exception
-    assert not any(m.label == "Lift" for m in at.metric)  # outcome hidden before the reveal
-    at.button(key="pred_reveal").click().run()
-    assert not at.exception, at.exception
-    assert any(m.label == "Lift" for m in at.metric)
+    assert any(m.label == "Lift" for m in at.metric)  # Time Machine outcome always shown
     slider = at.select_slider(key="pred_knn_k")
     assert slider.value == _mock_metrics()["classify"]["knn_k"]  # starts at the best k
     assert len(slider.options) >= 2
@@ -102,38 +137,11 @@ def test_prediction_reveal_and_knn_slider(run_app_page):
     assert {m.label for m in at.metric} >= {"Train accuracy", "Test accuracy", "Gap (train − test)"}
 
 
-def test_segmentation_3d_toggle_and_recommendation_picker(run_app_page):
+def test_segmentation_has_2d_map_only(run_app_page):
     at = run_app_page("Home.py")
     at.switch_page("pages/3_Segmentation.py").run()
-    at.toggle(key="seg_pca_3d").set_value(True).run()
     assert not at.exception, at.exception
-    at.switch_page("pages/5_Recommendation.py").run()
-    assert not at.exception, at.exception
-    rules = pd.read_parquet(C.mock_path(C.RULES_PARQUET))
-    products = pd.read_parquet(C.mock_path(C.PRODUCTS_PARQUET))
-    codes = VR.antecedent_products(rules, products)["stock_code"].tolist()
-    at.selectbox(key="rec_product").set_value(codes[-1]).run()
-    assert not at.exception, at.exception
-    assert at.selectbox(key="rec_product").value == codes[-1]
-
-
-def test_insights_shows_readme_limitations(run_app_page):
-    from retailpulse.insights import limitations
-
-    at = run_app_page("Home.py")
-    at.switch_page("pages/6_Insights.py").run()
-    assert not at.exception, at.exception
-    expected = limitations(C.README_MD.read_text(encoding="utf-8"))
-    assert len(expected) == 4
-    assert all(item in _markdown(at) for item in expected)
-
-
-def test_guided_tour_toggle_shows_callouts(run_app_page):
-    at = run_app_page("Home.py")
-    assert not at.info
-    at.sidebar.toggle(key="tour_toggle").set_value(True).run()
-    assert not at.exception
-    assert any("Tour 1" in i.value for i in at.info)
+    assert not at.toggle
 
 
 def test_segmentation_pc_lines_show_variance_share(run_app_page):
@@ -152,10 +160,10 @@ def test_prediction_without_test_rows_for_best_model(mock_artifacts, tmp_path, m
     monkeypatch.setenv("RETAILPULSE_ARTIFACTS", str(tmp_path))  # every other file: mock
     at = AppTest.from_file(str(APP_DIR / "Home.py"), default_timeout=120)
     at.run()
+    assert not at.exception, at.exception
     at.switch_page("pages/4_Prediction.py").run()
     assert not at.exception, at.exception
     assert any("No test-window predictions" in i.value for i in at.info)
-    assert not any(b.key == "pred_reveal" for b in at.button)
 
 
 def test_horizon_days_falls_back_to_config(mock_artifacts, tmp_path, monkeypatch):
@@ -209,7 +217,7 @@ def test_page_links_point_at_real_files(page):
 
 
 def _badge_and_verdict(at) -> tuple[str, str]:
-    """(segment badge markdown, verdict markdown) of the Home cards."""
+    """(segment badge markdown, verdict markdown) of the demo cards."""
     badge = next(m.value for m in at.markdown if m.value.startswith("Segment: "))
     verdict = next(m.value for m in at.markdown if "come back** within" in m.value)
     return badge, verdict
@@ -217,7 +225,7 @@ def _badge_and_verdict(at) -> tuple[str, str]:
 
 def test_home_first_and_last_preset_change_badge_and_probability(run_app_page):
     """Typical <first segment> vs Typical <last segment>: badge + chosen P(return) change."""
-    at = run_app_page("Home.py")
+    at = _demo(run_app_page)
     presets = pd.read_parquet(C.mock_path(C.SEGMENT_PRESETS_PARQUET))
     names = {int(k): v for k, v in _mock_metrics()["segment"]["segment_names"].items()}
     first, last = int(presets["segment"].min()), int(presets["segment"].max())

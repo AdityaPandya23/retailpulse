@@ -66,17 +66,13 @@ with st.container(border=True):
 st.subheader("3 · The customer map (PCA)")
 tour.callout(
     2,
-    "PCA squeezes the features into 2-3 new axes that keep most of the spread, so customers "
+    "PCA squeezes the features into 2 new axes that keep most of the spread, so customers "
     "can be drawn on a map. The segments sit in different regions.",
     "PCA map",
 )
-three_d = st.toggle("3D view (drag to rotate)", key="seg_pca_3d")
 col_map, col_scree = st.columns([3, 2])
 with col_map:
-    if three_d:
-        layout.chart(S.pca_scatter_3d(segments, names, explained), key="seg_pca3d")
-    else:
-        layout.chart(S.pca_scatter_2d(segments, names, explained), key="seg_pca2d")
+    layout.chart(S.pca_scatter_2d(segments, names, explained), key="seg_pca2d")
 with col_scree:
     layout.chart(S.scree_plot(explained), key="seg_scree")
     st.markdown("**What each axis means**")
@@ -132,4 +128,4 @@ with col_box:
 layout.conclusion(seg.get("conclusion"))
 
 st.divider()
-st.page_link("Home.py", label="← Back to the live demo", icon=":material/home:")
+st.page_link("pages/2_Demo.py", label="← Back to the live demo", icon=":material/play_circle:")

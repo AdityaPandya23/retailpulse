@@ -82,7 +82,7 @@ def test_pipeline_dot_names_every_stage_and_model():
     assert dot.startswith("digraph") and dot.rstrip().endswith("}")
     for word in ("Raw Excel", "Clean", "Features", "K-Means", "2 classifiers", "Dashboard"):
         assert word in dot
-    assert "logistic · knn" in dot and "clean -> rules" in dot
+    assert "logistic · knn" in dot and "rules" not in dot
 
 
 def test_score_customer_with_mock_models():

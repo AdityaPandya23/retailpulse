@@ -15,7 +15,8 @@ Academic DSF project (NIT Warangal). Design (v2, simplified): @PLAN.md. Progress
 - Tests use the synthetic fixture in tests/conftest.py, never the real dataset.
 - k and segment names are chosen automatically by the metric rule in segment/cluster.py (user decision,
   P6a); never add TODO(human) for them. config.yaml segment.k / segment.names can still override.
-- App v2 = 6-page "hub and spokes" demo (PLAN.md); the old 4-page app lives only in git tag v1-full.
+- App v2.1 = 4 pages: Home (overview + pipeline + data), Demo, Segmentation, Prediction.
+  Recommendation / Insights pages are hidden in app/hidden_pages/ (not shown). Old app: git tag v1-full.
 
 ## Commands (Windows, run from repo root)
 - Activate env: .venv\Scripts\activate

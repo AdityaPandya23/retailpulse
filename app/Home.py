@@ -1,56 +1,37 @@
-"""RetailPulse v2 home = the LIVE DEMO (hub). Run: streamlit run app/Home.py
+"""RetailPulse v2 home = the OVERVIEW: headline numbers, the pipeline and the dataset (card,
+columns, sample rows, cleaning funnel, sales over time, countries). Run: streamlit run app/Home.py
 
-Describe one customer (a "Typical <segment>" preset or 6 typed numbers) and a basket; the
-saved models answer the three questions in three cards, each linking to its explainer page.
+The live demo (score one customer with the saved models) is the next page, pages/2_Demo.py.
 All logic is in retailpulse.demo / viz; this page only lays it out.
 """
 
 from __future__ import annotations
 
 import streamlit as st
-from components import data, layout, tour
+from components import data, layout
 
 from retailpulse import contracts as C
 from retailpulse import demo
-from retailpulse.baskets.rules import recommend_from_basket
-from retailpulse.viz import predictions as VP
-from retailpulse.viz import segments as S
+from retailpulse.viz import data_cube as D
 from retailpulse.viz.common import money
-from retailpulse.viz.customer import segment_badge_html
 
-FEATURES = demo.DEMO_FEATURES
-VALUES_KEY = "demo_values"  # plain session state: survives page switches (widget keys do not)
-BASKET_KEY = "demo_basket_codes"
-BASKET_WIDGET = "demo_basket"
-PCA_POINTS = 2000
-HOW = "How does this work? →"
+DEMO_LABEL = "Next: the live demo →"
 
-
-def _widget(feature: str) -> str:
-    return f"demo_in_{feature}"
-
-
-layout.setup_page("Live demo")
+layout.setup_page("Overview")
 layout.page_header(
     "RetailPulse",
-    "Who are our customers, will they come back, and what should we offer them?",
-    f"Live demo: describe a customer with {len(FEATURES)} numbers and a basket, and the saved "
-    "models answer "
-    "all three questions. Every card links to a page that explains how it works.",
+    "Who are our customers, and will they come back?",
+    "Overview: the data, how it was cleaned and the pipeline behind the models. "
+    "The live demo on the next page scores one customer with the saved models.",
 )
 
-# ------------------------------------------------------------------ headline + pipeline
-facts = demo.kpi_facts(
-    data.json_file(C.WAREHOUSE_SUMMARY_JSON),
-    data.json_file(C.CLEANING_STEPS_JSON),
-    data.json_file(C.FORMAT_COMPARISON_JSON),
-)
-tour.callout(
-    1,
-    "A UK online gift shop's invoices, cleaned. Open the pipeline below to see "
-    "how raw Excel becomes the three models behind the cards.",
-    "The data",
-)
+fmt = data.json_file(C.FORMAT_COMPARISON_JSON)
+cleaning = data.json_file(C.CLEANING_STEPS_JSON)
+eda = data.metrics("eda")
+
+# ------------------------------------------------------------------ overview
+st.subheader("Overview")
+facts = demo.kpi_facts(data.json_file(C.WAREHOUSE_SUMMARY_JSON), cleaning, fmt)
 layout.kpi_row(
     [
         {
@@ -70,162 +51,79 @@ layout.kpi_row(
         },
     ]
 )
-with st.expander("How it works: the pipeline", icon=":material/account_tree:"):
-    st.graphviz_chart(demo.pipeline_dot())
-    st.caption(
-        "An offline pipeline builds every model and table once; this app only reads the results."
-    )
 
-# ------------------------------------------------------------------ inputs
-names = data.segment_names()
-presets = data.table(C.SEGMENT_PRESETS_PARQUET)
-products = data.table(C.PRODUCTS_PARQUET)
-horizon = data.horizon_days()
-
-
-def _fill(segment_id: int) -> None:
-    """Preset button: copy the segment's typical (median) values into the inputs."""
-    values = demo.preset_values(presets, segment_id)
-    if not values:
-        return
-    st.session_state[VALUES_KEY] = values
-    for f, v in values.items():
-        st.session_state[_widget(f)] = v
-
-
-if VALUES_KEY not in st.session_state and names:
-    _fill(next(iter(names)))
-for f in FEATURES:  # restore inputs after a page switch (Streamlit drops widget state)
-    if _widget(f) not in st.session_state:
-        saved = st.session_state.get(VALUES_KEY, {}).get(f)
-        st.session_state[_widget(f)] = demo.input_value(f, saved)
-
-st.subheader("1 · Describe a customer")
-tour.callout(
-    2,
-    "Click a typical customer of a segment (the median of each number), or type your own. "
-    "Then add products to the basket.",
-    "Try it",
-)
-if names:
-    for col, (sid, name) in zip(st.columns(len(names)), names.items(), strict=True):
-        col.button(
-            f"Typical {name}",
-            key=f"preset_{sid}",
-            on_click=_fill,
-            args=(sid,),
-            width="stretch",
-            icon=":material/person:",
-        )
-for col, f in zip(st.columns(len(FEATURES)), FEATURES, strict=True):
-    spec = demo.input_spec(f)
-    col.number_input(
-        spec["label"],
-        min_value=spec["min"],
-        step=spec["step"],
-        key=_widget(f),
-        help=spec["help"],
-        format=None if spec["integer"] else "%.2f",
-    )
-values = {f: st.session_state[_widget(f)] for f in FEATURES}
-st.session_state[VALUES_KEY] = values
-preset = demo.matching_preset(presets, values)
+# ------------------------------------------------------------------ pipeline
+st.subheader("How it works: the pipeline")
+st.graphviz_chart(demo.pipeline_dot())
 st.caption(
-    f"Inputs = the typical **{names.get(preset, preset)}** customer (median of each number)."
-    if preset is not None
-    else "Inputs = your own numbers."
+    "An offline pipeline builds every model and table once; this app only reads the results."
 )
-for note in demo.input_warnings(values):
-    st.warning(note, icon=":material/warning:")
+st.page_link("pages/2_Demo.py", label=DEMO_LABEL, icon=":material/play_circle:")
 
-codes, desc = demo.product_options(products)
-if BASKET_KEY not in st.session_state:
-    st.session_state[BASKET_KEY] = demo.default_basket(data.metrics("rules"), codes)
-if BASKET_WIDGET not in st.session_state:
-    st.session_state[BASKET_WIDGET] = [c for c in st.session_state[BASKET_KEY] if c in desc]
-basket = st.multiselect(
-    "Basket: products this customer bought",
-    codes,
-    key=BASKET_WIDGET,
-    format_func=lambda c: f"{desc.get(c, c)} ({c})",
-    placeholder=f"Type to search the {len(codes):,} most-bought products",
-)
-st.session_state[BASKET_KEY] = basket
-
-# ------------------------------------------------------------------ results
-raw = demo.raw_frame(values)
-place = demo.place_segment(data.model(C.SEGMENT_MODEL_JOBLIB), raw)
-probs = demo.return_probabilities(data.model(C.CLASSIFIERS_JOBLIB), raw)
-answer = demo.verdict(probs, horizon)
-recs = (
-    recommend_from_basket(basket, data.table(C.RULES_PARQUET), products)
-    if products is not None
-    else None
-)
-
-st.subheader("2 · What the models say")
-tour.callout(
-    3,
-    "Each card answers one question for this customer. Change a number or the basket and "
-    "watch all three update; the link under each card opens its explainer page.",
-    "Three answers",
-)
-card_seg, card_back, card_offer = st.columns(3)
-with card_seg, st.container(border=True):
-    st.markdown("#### Who is this customer?")
-    sid = place["segment"]
+# ------------------------------------------------------------------ dataset card
+st.subheader("The dataset")
+with st.container(border=True):
     st.markdown(
-        "Segment: " + segment_badge_html(sid, names.get(sid) if sid is not None else None),
-        unsafe_allow_html=True,
+        "**[UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii)** "
+        "(Chen, 2012) · licence **CC BY 4.0**  \n"
+        "Every invoice line of a UK-based online shop that sells gifts, mostly to wholesalers."
     )
-    segments = data.table(C.SEGMENTS_PARQUET, columns=["customer_id", "segment", "pc1", "pc2"])
-    layout.chart(
-        S.pca_scatter_2d(
-            segments,
-            names,
-            data.metrics("segment").get("pca_explained_variance"),
-            n=PCA_POINTS,
-            star=place["pc"],
-            star_segment=sid,
-            height=430,
-        ),
-        key="home_pca",
+    sheets = fmt.get("sheets") or {}
+    layout.kpi_row(
+        [
+            {
+                "label": "Raw rows",
+                "value": f"{fmt['rows']:,}" if fmt.get("rows") else "n/a",
+                "help": " + ".join(f"{k}: {v:,}" for k, v in sheets.items()) or None,
+            },
+            {"label": "First invoice", "value": str(fmt.get("date_min", "n/a"))[:10]},
+            {"label": "Last invoice", "value": str(fmt.get("date_max", "n/a"))[:10]},
+            {"label": "Excel sheets", "value": str(len(sheets)) if sheets else "n/a"},
+        ]
     )
-    st.caption(
-        f"★ = this customer; faded dots = about {PCA_POINTS:,} real customers "
-        "(seeded sample), coloured by segment."
+st.markdown(f"**The {len(C.RAW_COLUMNS)} columns**")
+st.dataframe(D.raw_columns_table(), hide_index=True, width="stretch", key="data_columns")
+
+sample = data.table(C.EDA_SAMPLE_ROWS_PARQUET)
+st.markdown(
+    f"**{0 if sample is None else len(sample)} sample rows** "
+    "(after cleaning; line_value = quantity × price)"
+)
+if sample is None or sample.empty:
+    st.info("Sample rows are not available.")
+else:
+    st.dataframe(
+        sample,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "price": st.column_config.NumberColumn(format="£%.2f"),
+            "line_value": st.column_config.NumberColumn(format="£%.2f"),
+            "customer_id": st.column_config.NumberColumn(format="%d"),
+        },
+        key="data_sample",
     )
-    st.page_link("pages/3_Segmentation.py", label=HOW, icon=":material/scatter_plot:")
-with card_back, st.container(border=True):
-    st.markdown("#### Will they come back?")
-    st.markdown(answer["text"])
-    layout.chart(VP.model_probability_bars(probs, horizon), key="home_probs")
-    st.caption("Black tick = each model's threshold, chosen on the training data.")
-    st.page_link("pages/4_Prediction.py", label=HOW, icon=":material/insights:")
-with card_offer, st.container(border=True):
-    st.markdown("#### What to offer")
-    lines = demo.recommendation_lines(recs)
-    if not lines:
-        st.info("No products available.")
-    for line in lines:
-        st.markdown(
-            f"**{line['rank']}. {demo.md_escape(line['product'])}**  \n"
-            + demo.md_escape(line["reason"])
-        )
-    st.caption("Never a product that is already in the basket.")
-    st.page_link("pages/5_Recommendation.py", label=HOW, icon=":material/shopping_basket:")
+
+# ------------------------------------------------------------------ cleaning
+st.subheader("Cleaning")
+layout.chart(D.cleaning_sankey(cleaning), key="data_sankey")
+st.caption(
+    "Lines without a Customer ID (guest checkouts) cannot be linked to a customer, so they "
+    "are dropped: the results describe registered customers only."
+)
+
+# ------------------------------------------------------------------ the business
+st.subheader("Sales over time")
+layout.chart(D.monthly_trend(data.table(C.EDA_MONTHLY_PARQUET)), key="data_monthly")
+
+st.subheader("Customers and countries")
+col_pareto, col_country = st.columns(2)
+with col_pareto:
+    layout.chart(D.pareto_curve(data.table(C.EDA_PARETO_PARQUET), eda), key="data_pareto")
+with col_country:
+    layout.chart(D.country_revenue(data.table(C.EDA_COUNTRIES_PARQUET)), key="data_countries")
+layout.conclusion(eda.get("conclusion"))
 
 st.divider()
-st.markdown("**More:**")
-c_data, c_ins = st.columns(2)
-with c_data:
-    st.page_link(
-        "pages/2_Data.py", label="The data and how it was cleaned", icon=":material/database:"
-    )
-with c_ins:
-    st.page_link(
-        "pages/6_Insights.py",
-        label="What should the business do? (Insights)",
-        icon=":material/lightbulb:",
-    )
+st.page_link("pages/2_Demo.py", label=DEMO_LABEL, icon=":material/play_circle:")
 st.caption(layout.DATA_CREDIT + " Built with free, open-source tools only.")

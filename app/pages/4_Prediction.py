@@ -11,8 +11,6 @@ from retailpulse.config import PREDICT
 from retailpulse.viz import predictions as VP
 from retailpulse.viz.common import pct
 
-REVEAL_KEY = "pred_revealed"
-
 layout.setup_page("Prediction")
 horizon = data.horizon_days()
 layout.page_header(
@@ -108,14 +106,8 @@ with col_cm_text:
 
 # ------------------------------------------------------------------ Time Machine
 st.subheader("3 · Time Machine: were we right?")
-
-
-def _reveal(flag: bool) -> None:
-    st.session_state[REVEAL_KEY] = flag
-
-
 s = summary
-if not s.get("n_customers"):  # no test rows for the chosen model: nothing to reveal
+if not s.get("n_customers"):  # no test rows for the chosen model: nothing to show
     st.info(f"No test-window predictions for the chosen model ({best}).")
 else:
     st.markdown(
@@ -123,47 +115,34 @@ else:
         f"wrote down **{s['n_predicted']:,}** it expected to buy again within {horizon} days"
         + (f" (probability ≥ {threshold:.2f})." if threshold is not None else ".")
     )
-    if not st.session_state.get(REVEAL_KEY, False):
-        st.button(
-            "Reveal what actually happened",
-            key="pred_reveal",
-            type="primary",
-            icon=":material/visibility:",
-            on_click=_reveal,
-            args=(True,),
-        )
-    else:
-        st.button("Hide the outcome again", key="pred_hide", on_click=_reveal, args=(False,))
-        tour.callout(
-            3,
-            "Customers ranked by predicted probability into ten groups: the top group really came "
-            "back far more often than average, the bottom group rarely.",
-            "The reveal",
-        )
-        layout.kpi_row(
-            [
-                {"label": "We predicted", "value": f"{s['n_predicted']:,} customers"},
-                {
-                    "label": "… of whom bought again",
-                    "value": pct(s["share_actually_returned"]),
-                    "help": f"{s['n_predicted_and_returned']:,} of {s['n_predicted']:,}.",
-                },
-                {
-                    "label": "Base rate (all customers)",
-                    "value": pct(s["base_rate"]),
-                    "help": f"{s['n_actually_returned']:,} of {s['n_customers']:,} came back.",
-                },
-                {
-                    "label": "Lift",
-                    "value": f"{s['lift']:.2f}×" if s["lift"] == s["lift"] else "n/a",
-                    "help": "How much better than picking customers at random.",
-                },
-            ]
-        )
-        layout.chart(
-            VP.decile_figure(VP.deciles(best_test), s["base_rate"], best), key="pred_deciles"
-        )
-        layout.conclusion(bt.get("conclusion"), "Backtest")
+    tour.callout(
+        3,
+        "Customers ranked by predicted probability into ten groups: the top group really came "
+        "back far more often than average, the bottom group rarely.",
+        "The reveal",
+    )
+    layout.kpi_row(
+        [
+            {"label": "We predicted", "value": f"{s['n_predicted']:,} customers"},
+            {
+                "label": "… of whom bought again",
+                "value": pct(s["share_actually_returned"]),
+                "help": f"{s['n_predicted_and_returned']:,} of {s['n_predicted']:,}.",
+            },
+            {
+                "label": "Base rate (all customers)",
+                "value": pct(s["base_rate"]),
+                "help": f"{s['n_actually_returned']:,} of {s['n_customers']:,} came back.",
+            },
+            {
+                "label": "Lift",
+                "value": f"{s['lift']:.2f}×" if s["lift"] == s["lift"] else "n/a",
+                "help": "How much better than picking customers at random.",
+            },
+        ]
+    )
+    layout.chart(VP.decile_figure(VP.deciles(best_test), s["base_rate"], best), key="pred_deciles")
+    layout.conclusion(bt.get("conclusion"), "Backtest")
 
 # ------------------------------------------------------------------ KNN
 st.subheader("4 · KNN: how many neighbours?")
@@ -206,4 +185,4 @@ else:
     layout.chart(VP.knn_simple_figure(curve, k, best_k), key="pred_knn")
 
 st.divider()
-st.page_link("Home.py", label="← Back to the live demo", icon=":material/home:")
+st.page_link("pages/2_Demo.py", label="← Back to the live demo", icon=":material/play_circle:")
