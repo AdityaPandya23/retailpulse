@@ -33,9 +33,18 @@ DATA_CREDIT = (
 )
 
 
+# KPI tiles: wrap long values (date range, "1,234 customers") instead of cutting them with "…"
+_METRIC_CSS = """<style>
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+}
+</style>"""
+
+
 def setup_page(title: str) -> None:
     """First call on every page: page config, light / dark button, mock badge, data credit."""
     st.set_page_config(page_title=f"{title} · RetailPulse", layout="wide")
+    st.html(_METRIC_CSS)
     theme_button()
     mock = data.mock_files()
     if mock:
@@ -96,6 +105,7 @@ def kpi_row(items: Iterable[dict]) -> None:
                 delta_color=item.get("delta_color", "off"),
                 help=item.get("help"),
                 border=True,
+                height="stretch",  # same height for every tile in the row when one wraps
             )
 
 
