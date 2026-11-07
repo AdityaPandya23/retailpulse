@@ -17,6 +17,7 @@ from plotly.subplots import make_subplots
 
 from retailpulse import contracts as C
 from retailpulse.config import HORIZON_DAYS, SEED
+from retailpulse.segment import cluster
 from retailpulse.stats.tests import compare_groups, fmt_p
 from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
@@ -253,7 +254,7 @@ def pca_scatter_2d(
         )
     shown = len(pts)
     if shown < len(segments) and star is None:
-        title += f": {shown:,} of {len(segments):,} customers (seed {SEED})"
+        title += f": {shown:,} of {len(segments):,} customers"
     VC.style(fig, title, _pct_axis(explained, 0), _pct_axis(explained, 1), height=height)
     fig.update_layout(
         legend={"orientation": "h", "y": -0.18, "x": 0, "yanchor": "top", "itemsizing": "constant"}
@@ -654,6 +655,20 @@ def share_bars(profiles: pd.DataFrame | None, names: Mapping[int, str] | None = 
     VC.style(fig, title, "Segment", "Share (%)", height=400)
     fig.update_layout(legend={"orientation": "h", "y": 1.02, "x": 0, "yanchor": "bottom"})
     return fig
+
+
+def segment_conclusion(seg: Mapping | None, profiles: pd.DataFrame | None) -> str | None:
+    """Segmentation page closing line, rebuilt from metrics + profiles (same wording as the
+    pipeline's); falls back to the stored metrics.json text when a field is missing."""
+    seg = seg or {}
+    k, n = seg.get("k"), seg.get("n_customers")
+    cols = {"segment", "segment_name", "customer_share", "revenue_share"}
+    if k is None or n is None or _empty(profiles) or not cols <= set(profiles.columns):
+        return seg.get("conclusion")
+    top = profiles.sort_values("segment").iloc[0]
+    return cluster.segment_conclusion(
+        k, n, str(top["segment_name"]), top["customer_share"], top["revenue_share"]
+    )
 
 
 def segment_feature_frame(

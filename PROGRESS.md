@@ -223,6 +223,14 @@
   (st._config.set_option + rerun, server-wide); layout.chart recolours figure text/grid/surface for dark.
 - Checked: AppTest on real artifacts, 4 pages × light/dark, 0 exceptions. Tests: 292 pass; ruff clean.
 
+## P6e Simpler app wording (2026-11-07)
+- Segmentation: "Chosen: k = 3" without "(automatic rule)"; override caption removed; PCA map title without
+  "(seed 42)"; closing line = cluster.segment_conclusion (no log1p / k source / silhouette / ARI), rebuilt in the
+  app from metrics + profiles (viz.segments.segment_conclusion) so no pipeline rerun was needed.
+- Prediction "Are the models really different?": plain tie_note + new paired_t_note (gap 0.006 vs fold noise
+  ±0.013 → tied; knn +0.003 vs logistic, p = 0.30 → could be chance). metrics.json keeps the detailed texts.
+- Tests: 294 pass (+2). Ruff clean.
+
 ## Open items (human)
 1. Push the tag so README's v1 link works: `git push origin v1-full`.
 2. Deploy on share.streamlit.io (repo AdityaPandya23/retailpulse, main, app/Home.py, Python 3.12) → URL into README.

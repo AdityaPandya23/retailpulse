@@ -159,17 +159,32 @@ def test_tie_note_from_numbers():
             "b": {"test_auc": 0.80, "cv_auc_std": 0.01},
         },
     }
-    assert "practically tied" in VP.tie_note(
-        tied
-    ) and "(a) is not the best on test (b)" in VP.tie_note(tied)
+    note = VP.tie_note(tied)
+    assert "practically tied" in note and "gap of only 0.010" in note
+    assert "We kept a because it won on the training data, even though b" in note
     apart = {
         "models": {
             "a": {"test_auc": 0.6, "cv_auc_std": 0.01},
             "b": {"test_auc": 0.8, "cv_auc_std": 0.01},
         }
     }
-    assert "meaningful" in VP.tie_note(apart)
+    assert "the difference is real" in VP.tie_note(apart)
     assert VP.tie_note({"models": {"a": {"test_auc": 0.7}}}) is None
+
+
+def test_paired_t_note_plain_wording():
+    pt = {"model_a": "knn", "model_b": "logistic", "mean_auc_diff": 0.0029, "p_value": 0.299}
+    note = VP.paired_t_note({"cv_folds": 5, "paired_t_auc": pt})
+    assert note == (
+        "Significance test (paired t-test on the 5 training folds): knn beats logistic by only "
+        "+0.003 ROC-AUC (p = 0.30). p is above 0.05, so this small difference could just be "
+        "chance."
+    )
+    sig = VP.paired_t_note({"paired_t_auc": {**pt, "p_value": 0.0001}})
+    assert "(p < 0.001)" in sig and "the difference is real" in sig
+    old = {"paired_t_auc": {"conclusion": "stored text"}}
+    assert VP.paired_t_note(old) == "stored text"
+    assert VP.paired_t_note(None) is None
 
 
 # ---------------- confusion ----------------

@@ -215,6 +215,17 @@ def name_segments(z_means: pd.DataFrame, overrides: dict[int, str] | None = None
     return unique_names(names, kept)
 
 
+def segment_conclusion(
+    k: int, n_customers: int, top_name: str, customer_share: float, revenue_share: float
+) -> str:
+    """One plain closing sentence (no method details) for metrics.json and the app."""
+    return (
+        f"K-Means on standardised features splits the {int(n_customers):,} customers into "
+        f"k = {int(k)} segments; '{top_name}' is {float(customer_share):.0%} of customers but "
+        f"{float(revenue_share):.0%} of revenue."
+    )
+
+
 # ---------------- end-to-end (pure) ----------------
 @dataclass
 class SegmentationResult:
@@ -350,11 +361,8 @@ def segment_customers(
 
     top = profiles.iloc[0]
     ari = ari_by_k[k]
-    conclusion = (
-        f"K-Means on {len(feats)} log1p + standardised features splits the {len(f):,} customers "
-        f"into k = {k} segments ({k_source}; silhouette {quality['silhouette']:.2f}, mean "
-        f"subsample ARI {ari['mean']:.2f}); '{top['segment_name']}' is "
-        f"{top['customer_share']:.0%} of customers but {top['revenue_share']:.0%} of revenue."
+    conclusion = segment_conclusion(
+        k, len(f), top["segment_name"], top["customer_share"], top["revenue_share"]
     )
     metrics = {
         "k": k,

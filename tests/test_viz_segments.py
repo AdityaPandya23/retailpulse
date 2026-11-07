@@ -292,3 +292,26 @@ def test_biplot_labels_one_line_apart(segments):
 def test_parallel_profiles_legend_not_beside_plot(profiles):
     """Visual pass: a side legend squeezed the half-width plot to ~120 px."""
     assert S.parallel_profiles(profiles).layout.legend.orientation == "h"
+
+
+def test_segment_conclusion_plain_wording():
+    """App closing line: no method details (log1p, k source, silhouette, ARI); falls back to
+    the stored text when metrics or profiles are missing."""
+    profiles = pd.DataFrame(
+        {
+            "segment": [1, 0],
+            "segment_name": ["Lost", "Champions"],
+            "customer_share": [0.6, 0.4],
+            "revenue_share": [0.12, 0.88],
+        }
+    )
+    text = S.segment_conclusion({"k": 2, "n_customers": 5278}, profiles)
+    assert text == (
+        "K-Means on standardised features splits the 5,278 customers into k = 2 segments; "
+        "'Champions' is 40% of customers but 88% of revenue."
+    )
+    for word in ("log1p", "silhouette", "ARI", "automatic rule"):
+        assert word not in text
+    assert S.segment_conclusion({"conclusion": "old"}, profiles) == "old"
+    assert S.segment_conclusion({"k": 2, "n_customers": 10, "conclusion": "old"}, None) == "old"
+    assert S.segment_conclusion(None, None) is None

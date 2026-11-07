@@ -54,13 +54,9 @@ layout.chart(
     key="seg_k",
 )
 with st.container(border=True):
-    st.markdown(f"**Chosen: k = {chosen_k}** ({seg.get('k_source', 'automatic rule')})")
+    st.markdown(f"**Chosen: k = {chosen_k}**")
     if seg.get("k_choice_reason"):
         st.markdown(seg["k_choice_reason"])
-    st.caption(
-        "A human can override k and the names: set `segment.k` / `segment.names` in "
-        "`config.yaml` and rerun the pipeline."
-    )
 
 # ------------------------------------------------------------------ PCA
 st.subheader("3 · The customer map (PCA)")
@@ -125,7 +121,7 @@ with col_box:
         st.caption("Box = middle half of customers, line = median, dashed = mean.")
     else:
         st.info("Customer features are not available.")
-layout.conclusion(seg.get("conclusion"))
+layout.conclusion(S.segment_conclusion(seg, profiles))
 
 st.divider()
 st.page_link("pages/2_Demo.py", label="← Back to the live demo", icon=":material/play_circle:")

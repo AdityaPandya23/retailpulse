@@ -84,7 +84,7 @@ with col_table:
             "model). Test: the future window (only reported). Threshold: best F1 on training."
         )
     layout.conclusion(
-        [VP.tie_note(cls), (cls.get("paired_t_auc") or {}).get("conclusion")],
+        [VP.tie_note(cls), VP.paired_t_note(cls)],
         "Are the models really different?",
     )
 with col_roc:

@@ -15,7 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from retailpulse import contracts as C
-from retailpulse.config import HORIZON_DAYS
+from retailpulse.config import ALPHA, HORIZON_DAYS
 from retailpulse.predict.backtest import decile_table
 from retailpulse.viz import common as VC
 from retailpulse.viz import palette as P
@@ -355,24 +355,50 @@ def tie_note(cls_metrics: Mapping | None) -> str | None:
     lo_m, hi_m = min(test, key=test.get), max(test, key=test.get)
     spread = test[hi_m] - test[lo_m]
     text = (
-        f"Test ROC-AUC ranges from {test[lo_m]:.3f} ({lo_m}) to {test[hi_m]:.3f} ({hi_m}), "
-        f"a spread of {spread:.3f}"
+        f"On the future data the {len(test)} models score {test[lo_m]:.3f} to "
+        f"{test[hi_m]:.3f} ROC-AUC, a gap of only {spread:.3f}."
     )
     if sds:
         sd = float(np.mean(sds))
-        verdict = (
-            "about the size of the fold-to-fold noise, so the models are practically tied: "
-            "any of them ranks customers about equally well."
-            if spread <= 2 * sd
-            else "larger than the fold-to-fold noise, so the ranking of models is meaningful."
+        text += (
+            f" A model's score already moves by about ±{sd:.3f} from one training fold to the "
+            "next, so "
+            + (
+                "the models are practically tied."
+                if spread <= 2 * sd
+                else "this gap is bigger than that: the difference is real."
+            )
         )
-        text += f"; the CV AUC varies by ±{sd:.3f} between folds, " + verdict
-    else:
-        text += "."
     best = best_model(cls_metrics)
     if best and best in test and best != hi_m:
-        text += f" The model chosen on train CV ({best}) is not the best on test ({hi_m})."
+        text += (
+            f" We kept {best} because it won on the training data, even though {hi_m} "
+            "scores a little higher on the future data."
+        )
     return text
+
+
+def paired_t_note(cls_metrics: Mapping | None) -> str | None:
+    """Plain one-liner of the paired t-test on the per-fold CV AUCs (metrics paired_t_auc);
+    falls back to the stored conclusion when a field is missing."""
+    cls_metrics = cls_metrics or {}
+    pt = cls_metrics.get("paired_t_auc") or {}
+    a, b, diff, p = (pt.get(k) for k in ("model_a", "model_b", "mean_auc_diff", "p_value"))
+    if a is None or b is None or diff is None or p is None or not np.isfinite(float(p)):
+        return pt.get("conclusion")
+    folds = cls_metrics.get("cv_folds")
+    on = f"the {folds} training folds" if folds else "the training folds"
+    p = float(p)
+    shown = "p < 0.001" if p < 0.001 else f"p = {p:.2f}"
+    head = (
+        f"Significance test (paired t-test on {on}): {a} beats {b} by only "
+        f"{float(diff):+.3f} ROC-AUC ({shown})."
+    )
+    return head + (
+        f" p is below {ALPHA}, so the difference is real."
+        if p < ALPHA
+        else f" p is above {ALPHA}, so this small difference could just be chance."
+    )
 
 
 # ------------------------------------------------------------------ confusion matrix
